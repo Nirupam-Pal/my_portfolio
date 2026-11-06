@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: { default: siteTitle, template: "%s | Nirupam Pal" },
   description: siteDescription,
-  applicationName: "The Digital Architect",
+  applicationName: "The Computational Universe",
   authors: [{ name: "Nirupam Pal", url: siteUrl }],
   creator: "Nirupam Pal",
   keywords: ["Nirupam Pal", "Full-Stack Developer", "Next.js", "NestJS", "TypeScript", "Portfolio", "Tripura"],
@@ -61,7 +61,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           Skip to content
         </a>
 
-        <div aria-hidden="true" className="drawing-grid z-wash" />
+        <div aria-hidden="true" className="page-grid z-wash" />
         <div aria-hidden="true" id="wash-steel" className="wash wash-steel z-wash" />
         <div aria-hidden="true" id="wash-crimson" className="wash wash-crimson z-wash" />
         <div aria-hidden="true" id="wash-blue" className="wash wash-blue z-wash" />

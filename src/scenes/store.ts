@@ -21,12 +21,8 @@ export const sceneStore = {
   assemble: 0,
   pointerX: 0,
   pointerY: 0,
-  dragYaw: 0,
-  dragging: false,
   /** Temporarily overrides which beam and node groups are lit. */
   hoverGroups: null as readonly number[] | null,
-  /** The hovered skill, for lighting one node and its connections. */
-  focusSkill: null as string | null,
   reducedMotion: false,
   labelLayers: new Set<LabelLayer>(),
   /** Page elements that follow a form's sequence. Their [data-step-item] children get data-active. */

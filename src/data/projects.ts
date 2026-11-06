@@ -21,14 +21,14 @@ export interface Project {
   repo: string;
   features: readonly string[];
   achievements?: readonly string[];
-  caseStudy?: string;
+  caseStudy: string;
   /** What the 3D model acts out, in order. Each entry lights its part of the model. */
   flow: { title: string; steps: readonly string[] };
   /** Hovering a legend entry illuminates that group of nodes in the 3D model. */
   legend?: readonly { group: number; label: string }[];
   conceptNote: string;
   captures: readonly ProjectImage[];
-  /** Screens from inside the app, shown on a panel of their own after the project. */
+  /** Screens from inside the app, explained in the project's case study. */
   gallery?: readonly (ProjectImage & { caption: string })[];
 }
 
@@ -64,7 +64,7 @@ export const projects: readonly Project[] = [
       { group: 2, label: "Blood banks" },
     ],
     flow: { title: "The request flow", steps: ["Search by location", "Send a request", "Donor accepts", "Chat opens"] },
-    conceptNote: "3D form: a conceptual model, acting out the real request flow",
+    conceptNote: "3D form: a conceptual network, acting out the real request flow",
     captures: [
       {
         src: "/captures/bloodlink.webp",
@@ -86,9 +86,10 @@ export const projects: readonly Project[] = [
     live: "https://profile-link-zeta.vercel.app",
     liveLabel: "profile-link-zeta.vercel.app",
     repo: "https://github.com/Nirupam-Pal/proLink",
+    caseStudy: "/work/prolink",
     features: ["Posts", "Likes and comments", "User connections"],
     flow: { title: "What users do", steps: ["Publish a post", "Likes and comments", "Connect with a user"] },
-    conceptNote: "3D form: a conceptual model, acting out the real features",
+    conceptNote: "3D form: a conceptual social graph, acting out the real features",
     captures: [
       {
         src: "/captures/prolink.webp",
@@ -140,9 +141,10 @@ export const projects: readonly Project[] = [
     live: "https://wander-lust-6kcl.onrender.com/listings",
     liveLabel: "wander-lust-6kcl.onrender.com",
     repo: "https://github.com/Nirupam-Pal/Wander-Lust",
+    caseStudy: "/work/wanderlust",
     features: ["Property listings", "Custom pricing", "Reviews", "Secure authentication"],
     flow: { title: "Three real listings", steps: ["Lakeside house", "Timber cabin", "Villa and pool"] },
-    conceptNote: "3D form: a conceptual model, built from these listing photos",
+    conceptNote: "3D form: a conceptual map of these real listings",
     captures: [
       {
         src: "/captures/wanderlust-lake.webp",

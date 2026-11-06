@@ -4,6 +4,7 @@ import { RevealScope } from "@/components/layout/RevealScope";
 import { ModelLabels } from "@/components/sections/ModelLabels";
 import { About } from "@/components/sections/About";
 import { Achievements } from "@/components/sections/Achievements";
+import { ArtificialIntelligence } from "@/components/sections/ArtificialIntelligence";
 import { Contact } from "@/components/sections/Contact";
 import { Education } from "@/components/sections/Education";
 import { Experience } from "@/components/sections/Experience";
@@ -36,6 +37,9 @@ export default function HomePage() {
       </Deferred>
       <Deferred>
         <Skills />
+      </Deferred>
+      <Deferred>
+        <ArtificialIntelligence />
       </Deferred>
       <Deferred>
         <Achievements />

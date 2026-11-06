@@ -1,54 +1,46 @@
 /**
  * Every form in the experience is built from the same fixed pool of instances.
- * A generator describes a form as beams, light paths, glass panels and nodes; the
- * engine then interpolates between any two forms, so nothing ever cuts or fades:
- * the steel of the hero tower physically becomes each later scene.
+ * A generator describes a form as machined blocks, light paths, glass panels and nodes;
+ * the engine then interpolates between any two forms, so nothing ever cuts or fades:
+ * the modules of the hero's core physically become each later system.
  */
 import { clusters, skillLinks } from "@/data/skills";
 
 import {
   arc,
-  attendanceWing,
   avatarOf,
   BLOOD,
   bloodFrame,
+  CARD,
+  cardAt,
   clusterLayout,
-  creativityArcs,
-  creativityPoint,
-  ENGINEERING_X,
-  engineeringLanes,
-  floorY,
-  FOUNDATION,
-  lane,
-  leadershipSpokes,
-  leaveWing,
-  listingAt,
+  CONVERGE,
+  CORE,
+  ECOSYSTEM,
+  GIT,
+  KNOWLEDGE,
+  layerTech,
+  layerX,
   listings,
-  MAST,
+  MAP,
+  MILESTONE,
   miniNetwork,
-  linkTag,
-  outerRect,
-  PODIUM,
+  neuralRing,
+  neurons,
+  pinAt,
   PRO,
   skillLayout,
-  spokePoint,
-  STRATA,
-  TEAM_ANGLES,
-  teamPoint,
-  terrain,
-  THRESHOLD,
-  TOWER,
-  towerModules,
-  towerTech,
-  TREE_START,
+  skillLinkTag,
+  synapses,
+  synapseTag,
   type V3,
 } from "./layouts";
 
 export const COUNT = { beams: 480, paths: 170, panels: 44, nodes: 96 } as const;
-export const STRIDE = { beams: 7, paths: 7, panels: 10, nodes: 4 } as const;
+export const STRIDE = { beams: 8, paths: 7, panels: 10, nodes: 4 } as const;
 
 export interface Form {
-  /** ax ay az bx by bz thickness */
+  /** ax ay az bx by bz width height */
   beams: Float32Array;
   beamGroups: Uint8Array;
   beamTags: Int16Array;
@@ -79,6 +71,7 @@ interface BeamRecord {
   a: V3;
   b: V3;
   t: number;
+  h: number;
   group: number;
   tag: number;
 }
@@ -102,7 +95,23 @@ class FormBuilder {
   }
 
   beam(a: V3, b: V3, t = 0.02, group = 0, tag = -1) {
-    this.beamsList.push({ a, b, t, group, tag });
+    this.beamsList.push({ a, b, t, h: t, group, tag });
+  }
+
+  /** A solid machined block, turned by yaw around its vertical axis. Size is length, height, depth. */
+  block(c: V3, s: V3, yaw = 0, group = 0, tag = -1) {
+    const dx = (Math.cos(yaw) * s[0]) / 2;
+    const dz = (Math.sin(yaw) * s[0]) / 2;
+    this.beamsList.push({ a: [c[0] - dx, c[1], c[2] - dz], b: [c[0] + dx, c[1], c[2] + dz], t: s[2], h: s[1], group, tag });
+  }
+
+  /** A ring of solid segments lying flat, like the rim of a machined disc. */
+  ring(c: V3, r: number, h: number, w: number, sides: number, group = 0, tag = -1, turn = 0) {
+    const len = 2 * r * Math.tan(Math.PI / sides);
+    for (let i = 0; i < sides; i++) {
+      const a = (i / sides) * Math.PI * 2 + turn;
+      this.block([c[0] + Math.cos(a) * r, c[1], c[2] + Math.sin(a) * r], [len, h, w], a + Math.PI / 2, group, tag);
+    }
   }
 
   polyline(points: readonly V3[], t = 0.02, group = 0, closed = false, tag = -1) {
@@ -186,9 +195,9 @@ class FormBuilder {
     // Unused instances collapse to a hidden point inside the form.
     while (this.beamsList.length < COUNT.beams) {
       const p = this.randomInBounds();
-      this.beamsList.push({ a: p, b: p, t: 0, group: 255, tag: -1 });
+      this.beamsList.push({ a: p, b: p, t: 0, h: 0, group: 255, tag: -1 });
     }
-    // Sorting by height means morphs read as floors rearranging, not a swarm crossing itself.
+    // Sorting by height keeps morphs orderly: parts move as bands, not as a swarm crossing itself.
     const midY = (r: BeamRecord) => r.a[1] + r.b[1];
     const beamList = this.beamsList.slice(0, COUNT.beams).sort((x, y) => midY(x) - midY(y));
 
@@ -196,7 +205,7 @@ class FormBuilder {
     const beamGroups = new Uint8Array(COUNT.beams);
     const beamTags = new Int16Array(COUNT.beams);
     beamList.forEach((r, i) => {
-      beams.set([...r.a, ...r.b, r.t], i * STRIDE.beams);
+      beams.set([...r.a, ...r.b, r.t, r.h], i * STRIDE.beams);
       beamGroups[i] = r.group;
       beamTags[i] = r.tag;
     });
@@ -247,245 +256,274 @@ class FormBuilder {
   }
 }
 
-function rectAt(y: number, w: number, d: number, rot: number, ox = 0, oz = 0): V3[] {
-  const c = Math.cos(rot);
-  const s = Math.sin(rot);
-  const corners: [number, number][] = [
-    [-w, -d],
-    [w, -d],
-    [w, d],
-    [-w, d],
+/** Phase at or above this means the path holds a steady line and never carries a pulse. */
+const QUIET = 10;
+
+const plus = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const along = (a: V3, b: V3, t: number): V3 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+
+/**
+ * The machine at the centre of the hero, reused where the story returns to it. Precision layers around an open
+ * heart of light, with four ports where the rest of the application connects. Deliberately not any real chip.
+ */
+function coreBody(b: FormBuilder, c: V3, s: number, group = 0) {
+  const P = (x: number, y: number, z: number): V3 => [c[0] + x * s, c[1] + y * s, c[2] + z * s];
+  const plate = (y: number, size: number, h: number, yaw: number) => b.block(P(0, y, 0), [size * s, h * s, size * s], yaw, group);
+
+  plate(-1.08, 2.25, 0.14, 0);
+  b.ring(P(0, -0.76, 0), 1.08 * s, 0.34 * s, 0.2 * s, 8, group, -1, Math.PI / 8);
+  plate(-0.44, 1.62, 0.1, Math.PI / 4);
+  b.ring(P(0, 0, 0), 0.76 * s, 0.46 * s, 0.13 * s, 8, group);
+  plate(0.44, 1.62, 0.1, Math.PI / 4);
+  b.ring(P(0, 0.76, 0), 1.08 * s, 0.34 * s, 0.2 * s, 8, group, -1, Math.PI / 8);
+  // The cap is open in the middle, so the light inside shows from above as well.
+  [[0, -0.66], [0, 0.66]].forEach(([x, z]) => b.block(P(x, 1.08, z), [2.25 * s, 0.14 * s, 0.93 * s], 0, group));
+  [[-0.66, 0], [0.66, 0]].forEach(([x, z]) => b.block(P(x, 1.08, z), [0.93 * s, 0.14 * s, 0.4 * s], 0, group));
+
+  // Ports, and the fine traces running out to them over each layer.
+  ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).forEach(([x, z], n) => {
+    const yaw = x === 0 ? Math.PI / 2 : 0;
+    b.block(P(x * 1.36, 0, z * 1.36), [0.5 * s, 0.26 * s, 0.34 * s], yaw, group);
+    b.block(P(x * 1.66, 0, z * 1.66), [0.1 * s, 0.4 * s, 0.5 * s], yaw, group);
+    const to = P(x * 1.62, 0.15, z * 1.62);
+    b.route([P(x * 0.5, 0.15, z * 0.5), P(x * 1.0, 0.15, z * 1.0), to], n * 0.2, 0.06);
+    const low = P(x * 1.62, -0.15, z * 1.62);
+    b.route([low, P(x * 1.0, -0.15, z * 1.0), P(x * 0.5, -0.15, z * 0.5)], 0.1 + n * 0.2, 0.06);
+  });
+
+  // The heart: light moving between the layers.
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const x = Math.cos(a) * 0.38;
+    const z = Math.sin(a) * 0.38;
+    b.route([P(x, -0.42, z), P(x, -0.14, z), P(x, 0.14, z), P(x, 0.42, z)], i * 0.25, 0.05);
+  }
+  b.panel(P(0, -0.2, 0), [0.62 * s, 0, 0], [0, 0, 0.62 * s], 0.75);
+  b.panel(P(0, 0.2, 0), [0.62 * s, 0, 0], [0, 0, 0.62 * s], 0.75);
+  b.node(P(0, 0, 0), 0.42 * s, group);
+  [-0.26, 0.26].forEach((y) => b.node(P(0, y, 0), 0.16 * s, group));
+  [0, 1, 2, 3].forEach((i) => {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    b.node(P(Math.cos(a) * 0.38, 0, Math.sin(a) * 0.38), 0.1 * s, 1);
+  });
+}
+
+/** A thin floating surface, drawn as an interface: a frame, a header and blocks of layout. Never fake code. */
+function interfacePanel(b: FormBuilder, c: V3, u: V3, v: V3, group: number, tag: number, kind: number) {
+  const at = (x: number, y: number): V3 => [c[0] + u[0] * x + v[0] * y, c[1] + u[1] * x + v[1] * y, c[2] + u[2] * x + v[2] * y];
+  b.panel(c, u, v, 0.1, tag);
+  b.polyline([at(-1, -1), at(1, -1), at(1, 1), at(-1, 1)], 0.022, group, true, tag);
+  b.beam(at(-1, 0.72), at(1, 0.72), 0.008, group, tag);
+  b.beam(at(-0.88, 0.86), at(-0.45, 0.86), 0.022, group, tag);
+  if (kind === 0) {
+    b.panel(at(-0.42, 0.04), [u[0] * 0.46, u[1] * 0.46, u[2] * 0.46], [v[0] * 0.5, v[1] * 0.5, v[2] * 0.5], 0.2, tag);
+    [0.4, 0.14, -0.12].forEach((y, i) => b.beam(at(0.16, y), at(0.86 - i * 0.2, y), 0.016, group, tag));
+    b.beam(at(0.16, -0.54), at(0.58, -0.54), 0.05, group, tag);
+  } else if (kind === 1) {
+    [-0.56, 0, 0.56].forEach((x) => {
+      b.panel(at(x, -0.1), [u[0] * 0.22, u[1] * 0.22, u[2] * 0.22], [v[0] * 0.55, v[1] * 0.55, v[2] * 0.55], 0.14, tag);
+    });
+  } else {
+    [0.42, 0.14, -0.14, -0.42].forEach((y, i) => {
+      b.beam(at(-0.84, y), at(-0.6, y), 0.05, group, tag);
+      b.beam(at(-0.46, y), at(0.84 - (i % 2) * 0.3, y), 0.014, group, tag);
+    });
+  }
+}
+
+/** One machined service: a block with a seam of light around it and a status node. */
+function serviceModule(b: FormBuilder, c: V3, s: V3, yaw: number, group: number, tag: number) {
+  b.block(plus(c, [0, s[1] * 0.27, 0]), [s[0], s[1] * 0.46, s[2]], yaw, group, tag);
+  b.block(plus(c, [0, -s[1] * 0.27, 0]), [s[0], s[1] * 0.46, s[2]], yaw, group, tag);
+  b.panel(c, [Math.cos(yaw) * s[0] * 0.46, 0, Math.sin(yaw) * s[0] * 0.46], [-Math.sin(yaw) * s[2] * 0.46, 0, Math.cos(yaw) * s[2] * 0.46], 0.8, tag);
+  b.node(plus(c, [Math.cos(yaw) * s[0] * 0.3, 0, Math.sin(yaw) * s[0] * 0.3 + s[2] * 0.54]), 0.07, 1, tag);
+}
+
+/** A database: stacked discs, with the rows running through them. */
+function databaseStack(b: FormBuilder, c: V3, r: number, group: number, tag: number, discs = 3) {
+  for (let i = 0; i < discs; i++) {
+    const y = c[1] + (i - (discs - 1) / 2) * r * 0.62;
+    b.ring([c[0], y, c[2]], r, r * 0.3, r * 0.22, 10, group, tag);
+    b.panel([c[0], y + r * 0.13, c[2]], [r * 0.86, 0, 0], [0, 0, r * 0.86], 0.34, tag);
+    b.node([c[0] + r * 0.2, y + r * 0.2, c[2] + r * 1.08], 0.055, 1, tag);
+  }
+  const top = c[1] + ((discs - 1) / 2) * r * 0.62;
+  const bottom = c[1] - ((discs - 1) / 2) * r * 0.62;
+  b.route([[c[0], top + r * 0.2, c[2]], [c[0], c[1], c[2]], [c[0], bottom - r * 0.2, c[2]]], 0.1, 0.08, tag);
+}
+
+/** The hero: one full-stack application as a single floating machine, with a small network learning beside it. */
+function buildCore(): Form {
+  const b = new FormBuilder(11, { min: [-3, -3, -2], max: [3, 3, 2] });
+  coreBody(b, [0, 0, 0], 1);
+
+  // Frontend: thin screens hanging in the air above the core, tilted towards the viewer.
+  const F = CORE.frontend;
+  interfacePanel(b, plus(F, [-0.82, 0.1, -0.5]), [0.74, 0.02, 0.1], [0.04, 0.56, -0.2], 0, 0, 1);
+  interfacePanel(b, plus(F, [0.25, 0.42, 0]), [0.82, 0, 0.04], [0, 0.6, -0.18], 0, 0, 0);
+  interfacePanel(b, plus(F, [-0.3, -0.56, 0.75]), [0.62, -0.02, 0.12], [0.02, 0.42, -0.14], 0, 0, 2);
+  const frontPort: V3 = [0, 0, 1.72];
+  const frontDown: V3 = plus(F, [0.25, -0.2, 0.05]);
+  const frontBend: V3 = [frontPort[0], frontDown[1] - 0.6, frontPort[2]];
+  b.beam(frontPort, frontBend, 0.03, 0, 1);
+  b.beam(frontBend, frontDown, 0.03, 0, 1);
+  b.route([frontDown, frontBend, frontPort], 0.2, 0.09, 1);
+  b.route([frontPort, frontBend, frontDown], 0.7, 0.09, 1);
+  b.route([plus(F, [-0.82, -0.46, -0.5]), plus(F, [-0.1, -0.5, -0.1]), frontDown], 0.45, 0.07, 0);
+  b.route([plus(F, [-0.3, -0.14, 0.75]), frontDown], 0.1, 0.07, 0);
+
+  // APIs: a gateway the backend's traffic passes through, and the bright routes joining everything.
+  const G = CORE.gateway;
+  const gate = (x: number, r: number): V3[] => Array.from({ length: 12 }, (_, i) => {
+    const a = (i / 12) * Math.PI * 2;
+    return [x, G[1] + Math.cos(a) * r, G[2] + Math.sin(a) * r] as V3;
+  });
+  b.polyline(gate(G[0], 0.5), 0.05, 0, true, 1);
+  b.polyline(gate(G[0] + 0.14, 0.36), 0.016, 0, true, 1);
+  [0, 2.09, 4.19].forEach((a) => b.node([G[0], G[1] + Math.cos(a) * 0.5, G[2] + Math.sin(a) * 0.5], 0.09, 1, 1));
+
+  // Backend: services talking to each other.
+  const B = CORE.backend;
+  const services: { at: V3; s: V3 }[] = [
+    { at: plus(B, [-0.1, 0.2, 0.05]), s: [0.98, 0.5, 0.74] },
+    { at: plus(B, [0.55, 1.08, -0.35]), s: [0.72, 0.4, 0.56] },
+    { at: plus(B, [0.5, -0.74, 0.3]), s: [0.76, 0.42, 0.6] },
+    { at: plus(B, [-0.36, 1.0, 0.55]), s: [0.54, 0.34, 0.46] },
   ];
-  return corners.map(([x, z]) => [x * c - z * s + ox, y, x * s + z * c + oz] as V3);
+  services.forEach(({ at, s }) => serviceModule(b, at, s, 0.18, 0, 2));
+  ([[0, 1], [0, 2], [0, 3], [1, 3]] as const).forEach(([p, q], n) => {
+    b.beam(services[p].at, services[q].at, 0.022, 0, 2);
+    b.route([services[p].at, along(services[p].at, services[q].at, 0.5), services[q].at], n * 0.22, 0.08, 2);
+  });
+  const backPort: V3 = [1.72, 0, 0];
+  b.beam(backPort, services[0].at, 0.034, 0, 1);
+  b.route([backPort, G, services[0].at], 0, 0.1, 1);
+  b.route([services[0].at, plus(G, [0, 0.18, 0]), plus(backPort, [0, 0.18, 0])], 0.5, 0.1, 1);
+
+  // Database: disc stacks and an index of small blocks, feeding the core from below.
+  const D = CORE.database;
+  databaseStack(b, plus(D, [-0.24, 0, 0]), 0.62, 0, 3);
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 4; col++) {
+      const at: V3 = [D[0] + 0.72 + col * 0.26, D[1] - 0.26 + row * 0.26, D[2] + 0.18];
+      b.block(at, [0.19, 0.16, 0.2], 0, 0, 3);
+      if ((row + col) % 3 === 0) b.node(plus(at, [0, 0, 0.16]), 0.05, 1, 3);
+    }
+  }
+  const dbTop: V3 = [D[0] - 0.24, D[1] + 0.66, D[2]];
+  b.beam([0, -1.15, 0], dbTop, 0.034, 0, 1);
+  b.route([dbTop, [0, -1.15, 0]], 0.3, 0.1, 1);
+  b.route([[D[0] + 1.11, D[1] + 0.3, D[2] + 0.18], [0.55, -1.15, 0.2]], 0.65, 0.1, 1);
+
+  // A much smaller cluster to the side: the part still being learned.
+  const A = CORE.ai;
+  const layers: V3[][] = [
+    [[-0.62, 0.42, 0], [-0.62, -0.02, 0.18], [-0.62, -0.46, 0]],
+    [[0, 0.62, -0.1], [0, 0.2, 0.14], [0, -0.22, -0.14], [0, -0.64, 0.1]],
+    [[0.62, 0.22, 0.05], [0.62, -0.24, -0.05]],
+  ];
+  const world = layers.map((l) => l.map((p) => plus(A, p)));
+  world.forEach((l, li) => {
+    l.forEach((p) => b.node(p, 0.1, li === 1 ? 0 : 1, 4));
+    if (li === 0) return;
+    world[li - 1].forEach((q) => l.forEach((p, n) => {
+      b.beam(q, p, 0.0055, 0, 4);
+      if (n % 2 === 0) b.path(q, p, QUIET, 4);
+    }));
+  });
+  b.route([world[0][0], world[1][1], world[2][0]], 0.1, 0.1, 4);
+  b.route([world[0][2], world[1][2], world[2][1]], 0.55, 0.1, 4);
+  b.route([[0.9, 1.1, -0.2], plus(A, [-0.62, -0.46, 0])], 0.3, 0.1, 1);
+
+  return b.finish("core");
 }
 
 /**
- * The hero: the stack as a building. Heavy slabs divide it into four tiers, database at the bottom and frontend at the
- * top. The service core carries one node per technology, and each cantilevered module is a real piece of work,
- * wired through the core to the technologies it uses.
+ * About: the hero's machine pulled apart along one axis, so each layer can be read by itself and the data can be seen
+ * passing through all of them. Tags and groups are the layers, in stackLayers' order.
  */
-function buildTower(): Form {
-  const b = new FormBuilder(11, { min: [-2.2, -4.7, -2.2], max: [2.2, 4.7, 2.2] });
-  const floors = TOWER.floors;
-  let prevOuter: V3[] | null = null;
-  let prevCore: V3[] | null = null;
-  const floorOuter: V3[][] = [];
-  const floorCore: V3[][] = [];
-
-  for (let i = 0; i < floors; i++) {
-    const f = i / (floors - 1);
-    const y = floorY(i);
-    const { w, d, twist } = outerRect(f);
-    const outer = rectAt(y, w, d, twist);
-    const core = rectAt(y, TOWER.column, TOWER.column, 0);
-    floorOuter.push(outer);
-    floorCore.push(core);
-
-    // Every fourth floor is a slab between two tiers of the stack.
-    const mechanical = i % 4 === 0;
-    b.polyline(outer, mechanical ? 0.05 : 0.026, 0, true);
-    b.polyline(core, 0.018, 1, true);
-    if (mechanical) b.quad(outer[0], outer[1], outer[2], outer[3]);
-
-    if (prevOuter && prevCore) {
-      for (let c = 0; c < 4; c++) {
-        b.beam(prevOuter[c], outer[c], 0.03, 0);
-        b.beam(prevCore[c], core[c], 0.02, 1);
-      }
-      if (i % 2 === 0) {
-        const face = i % 4;
-        b.beam(prevOuter[face], outer[(face + 1) % 4], 0.009, 0);
-      }
-      if (b.random() < 0.5) {
-        const face = Math.floor(b.random() * 4);
-        b.quad(prevOuter[face], prevOuter[(face + 1) % 4], outer[(face + 1) % 4], outer[face]);
-      }
-    }
-    if (i % 2 === 1) {
-      for (let c = 0; c < 4; c++) b.beam(outer[c], core[c], 0.012, 0);
-    }
-    prevOuter = outer;
-    prevCore = core;
-  }
-
-  // The stack, in the core.
-  towerTech.forEach((tech) => b.node(tech.at, 0.075, 1, tech.tag));
-
-  // Real work, cantilevered off the core. Each module's light runs to the technologies it uses.
-  towerModules.forEach((module, m) => {
-    const { at: c, size: s, angle, tag } = module;
-    const y = c[1];
-    b.box(c, s, 0.015, 0, tag);
-    const near: V3 = [Math.cos(angle) * TOWER.column, y, Math.sin(angle) * TOWER.column];
-    const end: V3 = [c[0] - Math.cos(angle) * s[0] * 0.5, y, c[2] - Math.sin(angle) * s[2] * 0.5];
-    b.beam([near[0], y + 0.03, near[2]], [end[0], y + 0.03, end[2]], 0.014, 0, tag);
-    b.beam([near[0], y - 0.03, near[2]], [end[0], y - 0.03, end[2]], 0.014, 0, tag);
-    b.panel(c, [s[0] / 2, 0, 0], [0, s[1] / 2, 0], 0, tag);
-    b.panel([c[0], c[1] + s[1] / 2, c[2]], [s[0] / 2, 0, 0], [0, 0, s[2] / 2], 0, tag);
-    b.node(end, 0.07, 0, tag);
-    b.node(c, 0.14, 1, tag);
-
-    module.uses.forEach((t, n) => {
-      const techAt = towerTech[t].at;
-      b.route([c, near, [near[0], techAt[1], near[2]], techAt], n * 0.09, 0.05, linkTag(m, t));
-    });
-    // Not every module is software: this one runs to the people it coordinates.
-    module.team.forEach((person, n) => {
-      b.beam(c, person.at, 0.008, 0, tag);
-      b.node(person.at, 0.09, 1, tag);
-      b.route([c, person.at], n * 0.2, 0.05, tag);
-    });
-  });
-
-  // Light rising through the service core.
-  for (let c = 0; c < 2; c++) {
-    for (let i = 0; i < floors - 1; i++) {
-      b.path(floorCore[i][c * 2], floorCore[i + 1][c * 2], i * 0.06 + c * 0.5);
-    }
-  }
-  // Perimeter circuits on selected floors.
-  [4, 8, 12, 16].forEach((f, n) => {
-    const o = floorOuter[f];
-    b.route([o[0], o[1], o[2], o[3], o[0]], n * 0.23, 0.08);
-  });
-
-  // Tall, thin gates give the mass a sense of scale and scaffold.
-  const gate = (yaw: number, w: number, h: number) => {
-    const c = Math.cos(yaw) * w;
-    const s = Math.sin(yaw) * w;
-    b.polyline(
-      [
-        [-c, -h, -s],
-        [c, -h, s],
-        [c, h, s],
-        [-c, h, -s],
-      ],
-      0.009,
-      0,
-      true,
-    );
+function buildEcosystem(spread: number): Form {
+  const b = new FormBuilder(23, { min: [-4, -3, -3], max: [4, 3, 3] });
+  const X = (i: number) => layerX(i, spread);
+  const techNode = (i: number, t: number, r = 0.13) => {
+    const [y, z] = layerTech[i][t];
+    b.node([X(i), y, z], r, 1, i);
   };
-  gate(0.5, 3.05, 5);
-  gate(-1.05, 2.6, 4.3);
 
-  // Crown.
-  const crown = floorOuter[floors - 1];
-  crown.forEach((p) => b.node(p, 0.045, 0));
+  // Frontend: one large translucent screen, with the frameworks on it.
+  const x0 = X(0);
+  interfacePanel(b, [x0, 0, 0], [0, 0, 1.25], [0, 1.02, 0], 0, 0, 0);
+  [0, 1, 2].forEach((t) => techNode(0, t));
 
-  return b.finish("tower");
-}
+  // APIs and authentication: an open gateway the requests pass through.
+  const x1 = X(1);
+  const hoop = (x: number, r: number): V3[] => Array.from({ length: 16 }, (_, i) => {
+    const a = (i / 16) * Math.PI * 2;
+    return [x, Math.cos(a) * r, Math.sin(a) * r] as V3;
+  });
+  b.polyline(hoop(x1, 1.12), 0.09, 1, true, 1);
+  b.polyline(hoop(x1 + 0.12, 0.8), 0.016, 1, true, 1);
+  [0, 1, 2].forEach((t) => techNode(1, t));
 
-/** Four plates, one per area of expertise, each drawing what that paragraph of the About section says. */
-function buildStrata(): Form {
-  const b = new FormBuilder(23, { min: [-3, -3, -3], max: [3, 3, 3] });
-  const { levels, R } = STRATA;
-
-  levels.forEach((y, g) => {
-    b.polyline(
-      [
-        [-R, y, -R],
-        [R, y, -R],
-        [R, y, R],
-        [-R, y, R],
-      ],
-      0.022,
-      g,
-      true,
-    );
-    b.panel([0, y, 0], [R, 0, 0], [0, 0, R]);
+  // Backend: machined services.
+  const x2 = X(2);
+  layerTech[2].forEach(([y, z]) => {
+    b.block([x2, y, z], [0.5, 0.56, 1.02], 0, 2, 2);
+    b.panel([x2 - 0.255, y, z], [0, 0, 0.42], [0, 0.19, 0], 0.24, 2);
+  });
+  [0, 1, 2].forEach((t) => {
+    const [y, z] = layerTech[2][t];
+    b.node([x2 - 0.3, y, z], 0.11, 1, 2);
+    const [y2, z2] = layerTech[2][(t + 1) % 3];
+    b.beam([x2, y, z], [x2, y2, z2], 0.026, 2, 2);
+    b.route([[x2, y, z], [x2, (y + y2) / 2, (z + z2) / 2], [x2, y2, z2]], t * 0.3, 0.08, 2);
   });
 
-  // Engineering: the three layers named in the copy, tied by the auth that runs through them all.
-  const yE = levels[0];
-  engineeringLanes.forEach(({ z, left, right }, lane2) => {
-    b.beam([-R, yE, z], [R, yE, z], 0.016, 0);
-    b.beam([-R, yE, z + 0.42], [R, yE, z + 0.42], 0.005, 0);
-    b.beam([-R, yE, z - 0.42], [R, yE, z - 0.42], 0.005, 0);
-    b.node([ENGINEERING_X.left, yE, z], 0.11, 0);
-    b.node([ENGINEERING_X.right, yE, z], 0.11, 0);
-    if (left && right) b.route([[-R, yE, z], [ENGINEERING_X.left, yE, z], [ENGINEERING_X.right, yE, z], [ENGINEERING_X.rail, yE, z]], lane2 * 0.2, 0.08);
+  // Database: two stores, MongoDB and SQL.
+  const x3 = X(3);
+  layerTech[3].forEach(([y, z]) => {
+    databaseStack(b, [x3, y - 0.72, z], 0.66, 3, 3);
+    b.node([x3 - 0.7, y, z], 0.11, 1, 3);
+    b.beam([x3, y - 0.72, z], [x3, y - 0.72, 0], 0.03, 3, 3);
   });
-  b.beam([ENGINEERING_X.rail, yE, -R], [ENGINEERING_X.rail, yE, R], 0.03, 0);
-  b.route([[ENGINEERING_X.rail, yE, -2.1], [ENGINEERING_X.rail, yE, 0], [ENGINEERING_X.rail, yE, 2.1]], 0.1, 0.1);
-  engineeringLanes.forEach(({ z }) => b.node([ENGINEERING_X.rail, yE, z], 0.08, 0));
+  b.block([x3, 0, 0], [0.32, 0.32, 0.32], 0, 3, 3);
 
-  // Creativity: one arc per discipline Nirupam works alongside, all meeting at one corner.
-  const yC = levels[1];
-  creativityArcs.forEach(({ ring }, n) => {
-    const r = ring * 0.72;
-    const pts: V3[] = [];
-    for (let s = 0; s <= 9; s++) {
-      const a = (s / 9) * (Math.PI / 2);
-      pts.push([-R + Math.cos(a) * r, yC, -R + Math.sin(a) * r]);
-    }
-    b.polyline(pts, 0.016, 1);
-    b.route(pts, n * 0.3, 0.05);
-    const p = creativityPoint(ring);
-    b.node(p, 0.13, 1);
-    b.beam([-R, yC, -R], p, 0.007, 1);
+  // The data passing through all of it, in both directions.
+  const lanes: { y: number; z: number; phase: number; back?: boolean }[] = [
+    { y: 0.2, z: -0.3, phase: 0 },
+    { y: -0.25, z: 0.28, phase: 0.45, back: true },
+    { y: 0.5, z: 0.12, phase: 0.72 },
+  ];
+  lanes.forEach(({ y, z, phase, back }) => {
+    const pts: V3[] = [0, 1, 2, 3].map((i) => [X(i), y, z]);
+    pts.slice(0, -1).forEach((p, n) => b.route(back ? [pts[n + 1], p] : [p, pts[n + 1]], phase + (back ? 2 - n : n) * 0.18, 0.12, n + 1));
+    b.beam(pts[0], pts[3], 0.008, 5);
   });
 
-  // Problem solving: a decision tree converging on one lit route.
-  const yP = levels[2];
-  const branch = (p: V3, depth: number, spread: number, lit: boolean) => {
+  // Problem solving and system design: set apart, a decision tree with one route all the way through.
+  const P = ECOSYSTEM.problem;
+  const tree = (p: V3, depth: number, spreadY: number, lit: boolean) => {
     if (depth === 0) {
-      b.node(p, lit ? 0.13 : 0.05, 2);
+      b.node(p, lit ? 0.2 : 0.08, lit ? 1 : 0, 4);
       return;
     }
-    // Branches end at different distances: most options stop early, one route goes all the way.
-    const reach = lit ? 1.06 : 0.8 + b.random() * 0.28;
-    const left: V3 = [p[0] + reach, yP, p[2] - spread];
-    const right: V3 = [p[0] + reach, yP, p[2] + spread];
-    b.beam(p, left, 0.012, 2);
-    b.beam(p, right, 0.012, 2);
-    if (lit) b.path(p, right, (4 - depth) * 0.14);
-    branch(left, depth - 1, spread * 0.55, false);
-    branch(right, depth - 1, spread * 0.55, lit);
+    b.node(p, lit ? 0.12 : 0.07, 0, 4);
+    const up: V3 = [p[0] + 0.62, p[1] + spreadY, p[2] - 0.04];
+    const down: V3 = [p[0] + 0.62, p[1] - spreadY, p[2] + 0.04];
+    b.beam(p, up, 0.012, 4, 4);
+    b.beam(p, down, 0.012, 4, 4);
+    if (lit) b.path(p, down, (3 - depth) * 0.14, 4);
+    tree(up, depth - 1, spreadY * 0.5, false);
+    tree(down, depth - 1, spreadY * 0.5, lit);
   };
-  branch(TREE_START, 4, 1.05, true);
+  tree(plus(P, [-0.95, 0.1, 0]), 3, 0.5, true);
 
-  // Leadership: one hub, and what it actually does. Tasks go on to the three teams.
-  const yL = levels[3];
-  const ringPts: V3[] = [];
-  for (let s = 0; s < 18; s++) {
-    const a = (s / 18) * Math.PI * 2;
-    ringPts.push([Math.cos(a) * 1.95, yL, Math.sin(a) * 1.95]);
-  }
-  b.polyline(ringPts, 0.009, 3, true);
-  leadershipSpokes.forEach(({ angle }, n) => {
-    const p = spokePoint(angle);
-    b.beam([0, yL, 0], p, 0.018, 3);
-    b.node(p, 0.13, 3);
-    b.route([[0, yL, 0], [p[0] * 0.5, yL, p[2] * 0.5], p], n / 3, 0.08);
-  });
-  const tasks = spokePoint(leadershipSpokes[0].angle);
-  [-0.35, 0, 0.35].forEach((da, n) => {
-    const a = leadershipSpokes[0].angle + da;
-    const p: V3 = [Math.cos(a) * 2.6, yL, Math.sin(a) * 2.6];
-    b.beam(tasks, p, 0.008, 3);
-    b.node(p, 0.06, 3);
-    b.route([tasks, p], 0.4 + n * 0.1, 0.08);
-  });
-  b.node([0, yL, 0], 0.17, 3);
-
-  // Columns tying the plates into one structure.
-  for (let i = 0; i < 3; i++) {
-    for (const [x, z] of [
-      [-R, -R],
-      [R, -R],
-      [R, R],
-      [-R, R],
-    ]) {
-      b.beam([x, levels[i], z], [x, levels[i + 1], z], 0.012, 4);
-    }
-  }
-
-  return b.finish("strata");
+  return b.finish(`ecosystem-${spread}`);
 }
 
 /**
  * BloodLink, acting out its request flow. Tags are the steps: 0 search by location, 1 send a request, 2 donor accepts,
- * 3 chat opens. Node groups: 0 donors, 1 patients, 2 blood banks. The frames on the ground are the real search
+ * 3 chat opens. Node groups: 0 donors, 1 patients, 2 blood banks. The frames beneath it are the real search
  * hierarchy, nested down to the patient's city.
  */
 function buildBloodLink(): Form {
@@ -606,8 +644,10 @@ function buildBloodLink(): Form {
     });
   });
   banks.forEach((p, i) => {
-    b.node(p, 0.2, 2);
-    b.box(p, [0.32, 0.32, 0.32], 0.009, 2);
+    // A blood bank holds stock, so it is the one solid thing on the network.
+    b.block(plus(p, [0, 0.11, 0]), [0.42, 0.16, 0.42], 0.5, 2);
+    b.block(plus(p, [0, -0.11, 0]), [0.42, 0.16, 0.42], 0.5, 2);
+    b.node(plus(p, [0, 0, 0.26]), 0.14, 2);
     const [next] = nearest(p, banks.filter((_, j) => j !== i), 1);
     b.beam(p, next, 0.014, 2);
   });
@@ -701,423 +741,361 @@ function buildProLink(): Form {
 }
 
 /**
- * Wanderlust: three houses built from the three real listing photographs, each lighting with its picture. Tags are the
- * listings. The quieter houses further down the lane stand in for the rest of the listings page.
+ * Wanderlust: the listings as data on a map. Each real listing floats as a card above its pin, and a search panel
+ * reaches down to them. Tags are the listings. The smaller cards stand in for the rest of the listings page.
  */
 function buildWanderlust(): Form {
-  const b = new FormBuilder(71, { min: [-5, -1.5, -14], max: [5, 2, 3] });
-  const lanePts: V3[] = [];
-  for (let i = 0; i <= 34; i++) {
-    const z = 3 - (i / 34) * 17;
-    const x = lane(z);
-    lanePts.push([x, terrain(x, z) + 0.02, z]);
-  }
-  b.route(lanePts, 0, 0.028);
+  const b = new FormBuilder(71, { min: [-5, -1.5, -7], max: [5, 3, 3] });
+  const { y, x: mapX, nearZ, farZ } = MAP;
 
-  const gable = (x: number, y: number, z: number, w: number, h: number, roof: number, t: number, tag = -1) => {
-    const pts: V3[] = [
-      [x - w, y, z],
-      [x - w, y + h, z],
-      [x, y + roof, z],
-      [x + w, y + h, z],
-      [x + w, y, z],
-    ];
-    b.polyline(pts, t, 0, true, tag);
-    return pts;
+  // The map: a fine grid, with a couple of routes drawn across it.
+  for (let i = 0; i <= 12; i++) {
+    const gx = -mapX + (i / 12) * mapX * 2;
+    b.beam([gx, y, nearZ], [gx, y, farZ], i % 3 === 0 ? 0.008 : 0.004, 0);
+  }
+  for (let i = 0; i <= 11; i++) {
+    const gz = nearZ + (i / 11) * (farZ - nearZ);
+    b.beam([-mapX, y, gz], [mapX, y, gz], i % 3 === 0 ? 0.008 : 0.004, 0);
+  }
+  const road = (wob: number, k: number): V3[] =>
+    Array.from({ length: 15 }, (_, i) => {
+      const t = i / 14;
+      const gx = -mapX + t * mapX * 2;
+      return [gx, y + 0.015, k + Math.sin(t * 5 + wob) * 0.9 - t * 1.4] as V3;
+    });
+  const r1 = road(0.4, 0.9);
+  const r2 = road(2.3, -2.2);
+  b.polyline(r1, 0.016, 0);
+  b.polyline(r2, 0.012, 0);
+  b.route(r1, 0, 0.03);
+  b.route(r2, 0.5, 0.03);
+
+  const card = (c: V3, w: number, h: number, tag: number, glow: number, thick: number) => {
+    b.panel(c, [w, 0, 0], [0, h, 0], 0.05, tag);
+    b.polyline([[c[0] - w, c[1] - h, c[2]], [c[0] + w, c[1] - h, c[2]], [c[0] + w, c[1] + h, c[2]], [c[0] - w, c[1] + h, c[2]]], thick, 0, true, tag);
+    // The photograph, then the title and the nightly price below it.
+    b.panel([c[0], c[1] + h * 0.26, c[2] + 0.01], [w * 0.88, 0, 0], [0, h * 0.58, 0], glow, tag);
+    b.beam([c[0] - w * 0.88, c[1] - h * 0.52, c[2]], [c[0] + w * 0.3, c[1] - h * 0.52, c[2]], thick * 0.9, 0, tag);
+    b.beam([c[0] - w * 0.88, c[1] - h * 0.78, c[2]], [c[0] - w * 0.2, c[1] - h * 0.78, c[2]], thick * 1.4, 0, tag);
   };
-  const house = (x: number, y: number, z: number, w: number, d: number, h: number, roof: number, t: number, tag = -1) => {
-    const front = gable(x, y, z + d, w, h, roof, t, tag);
-    const back = gable(x, y, z - d, w, h, roof, t, tag);
-    for (let c = 0; c < 5; c++) b.beam(front[c], back[c], t * 0.7, 0, tag);
-  };
 
-  // The lakeside house: long and low, on a plinth at the water's edge.
-  {
-    const [x, y, z] = listingAt(listings[0]);
-    house(x, y + 0.12, z, 0.8, 0.42, 0.42, 0.78, 0.016, 0);
-    b.box([x, y + 0.06, z], [1.8, 0.12, 1.0], 0.012, 0, 0);
-    [-0.45, 0, 0.45].forEach((dx) => {
-      b.panel([x + dx, y + 0.34, z + 0.43], [0.15, 0, 0], [0, 0.16, 0], 0.35, 0);
-      b.node([x + dx, y + 0.34, z + 0.45], 0.07, 1, 0);
-    });
-    // The lake, with the house's lights drawn across it.
-    b.panel([x, y + 0.01, z + 1.0], [1.1, 0, 0], [0, 0, 0.42], 0, 0);
-    [-0.45, 0, 0.45].forEach((dx, i) => b.route([[x + dx, y + 0.02, z + 0.6], [x + dx, y + 0.02, z + 1.42]], i * 0.2, 0.05, 0));
-  }
+  // Each pin has a seat on the map, a stem and the listing's card.
+  listings.forEach((l, tag) => {
+    const pin = pinAt(l);
+    const c = cardAt(l);
+    const under: V3 = [c[0], c[1] - CARD.h, c[2]];
+    b.ring(pin, 0.3, 0.05, 0.05, 8, 0, tag);
+    b.node(plus(pin, [0, 0.03, 0]), 0.16, 1, tag);
+    b.beam(pin, under, 0.02, 0, tag);
+    b.route([pin, along(pin, under, 0.5), under], tag * 0.3, 0.08, tag);
+    card(c, CARD.w, CARD.h, tag, 0.14, 0.024);
+  });
 
-  // The timber cabin: a steep A-frame, its one tall window lit against the snow.
-  {
-    const [x, y, z] = listingAt(listings[1]);
-    const front = gable(x, y, z + 0.5, 0.62, 0.02, 1.38, 0.018, 1);
-    const back = gable(x, y, z - 0.5, 0.62, 0.02, 1.38, 0.018, 1);
-    for (let c = 0; c < 5; c++) b.beam(front[c], back[c], 0.012, 0, 1);
-    for (let i = 1; i < 5; i++) {
-      const k = i / 5;
-      const yy = y + k * 1.38;
-      const ww = 0.62 * (1 - k);
-      b.beam([x - ww, yy, z + 0.5], [x - ww, yy, z - 0.5], 0.005, 0, 1);
-      b.beam([x + ww, yy, z + 0.5], [x + ww, yy, z - 0.5], 0.005, 0, 1);
-    }
-    b.panel([x, y + 0.42, z + 0.5], [0.2, 0, 0], [0, 0.38, 0], 0.4, 1);
-    b.node([x, y + 0.42, z + 0.53], 0.1, 1, 1);
-    const snow: V3[] = Array.from({ length: 16 }, (_, i) => {
-      const a = (i / 16) * Math.PI * 2;
-      return [x + Math.cos(a) * 1.05, y + 0.01, z + Math.sin(a) * 1.05];
-    });
-    b.polyline(snow, 0.005, 0, true, 1);
-    b.route([...snow, snow[0]], 0, 0.02, 1);
-  }
+  // The search that found them: a query panel, and results travelling out to each card.
+  const S = MAP.search;
+  b.panel(S, [0.8, 0, 0], [0, 0.26, 0], 0.05);
+  b.polyline([[S[0] - 0.8, S[1] - 0.26, S[2]], [S[0] + 0.8, S[1] - 0.26, S[2]], [S[0] + 0.8, S[1] + 0.26, S[2]], [S[0] - 0.8, S[1] + 0.26, S[2]]], 0.02, 0, true);
+  b.beam([S[0] - 0.64, S[1], S[2]], [S[0] + 0.3, S[1], S[2]], 0.018, 0);
+  b.node([S[0] + 0.58, S[1], S[2]], 0.1, 1);
+  listings.forEach((l, tag) => {
+    const c = cardAt(l);
+    const pts = arc([S[0], S[1] - 0.26, S[2]], [c[0], c[1] + CARD.h, c[2]], 0.12, 6);
+    b.polyline(pts, 0.006, 0, false, tag);
+    b.route(pts, tag * 0.22, 0.04, tag);
+  });
 
-  // The villa: flat slabs stacked by the sea, with its infinity pool running off the edge.
-  {
-    const [x, y, z] = listingAt(listings[2]);
-    b.box([x, y + 0.24, z], [1.9, 0.48, 1.0], 0.016, 0, 2);
-    b.box([x - 0.25, y + 0.72, z], [1.1, 0.42, 0.8], 0.014, 0, 2);
-    b.beam([x - 1.15, y + 0.5, z + 0.6], [x + 1.15, y + 0.5, z + 0.6], 0.016, 0, 2);
-    [-0.6, 0, 0.6].forEach((dx) => {
-      b.panel([x + dx, y + 0.24, z + 0.5], [0.24, 0, 0], [0, 0.16, 0], 0.35, 2);
-      b.node([x + dx, y + 0.24, z + 0.52], 0.07, 1, 2);
-    });
-    b.panel([x + 0.1, y + 0.02, z + 1.05], [1.2, 0, 0], [0, 0, 0.3], 0, 2);
-    const rim: V3[] = [
-      [x - 1.1, y + 0.02, z + 0.75],
-      [x + 1.3, y + 0.02, z + 0.75],
-      [x + 1.3, y + 0.02, z + 1.35],
-      [x - 1.1, y + 0.02, z + 1.35],
-    ];
-    b.polyline(rim, 0.008, 0, true, 2);
-    b.route([...rim, rim[0]], 0, 0.06, 2);
-  }
-
-  // The rest of the listings page, receding down the lane.
-  const houses = 14;
-  for (let i = 0; i < houses; i++) {
-    const z = -6.6 - (i / (houses - 1)) * 7.4;
+  // The rest of the listings, further across the map.
+  for (let i = 0; i < 12; i++) {
     const side = i % 2 === 0 ? 1 : -1;
-    const x = lane(z) + side * (1.4 + b.random() * 1.8);
-    const y = terrain(x, z);
-    const w = 0.42 + b.random() * 0.24;
-    const d = 0.5 + b.random() * 0.4;
-    const h = 0.42 + b.random() * 0.36;
-    house(x, y, z, w, d, h, h + 0.26 + b.random() * 0.2, 0.011);
-    if (i < 10) b.panel([x, y + h * 0.5, z + d], [w * 0.26, 0, 0], [0, h * 0.26, 0], 1);
-    b.node([x, y + h * 0.5, z + d + 0.04], 0.05, 1);
+    const gx = side * (0.8 + b.random() * 3.3);
+    const gz = -2.2 - b.random() * 3.8;
+    const lift = 0.55 + b.random() * 0.55;
+    b.ring([gx, y, gz], 0.15, 0.03, 0.03, 6, 0);
+    b.node([gx, y + 0.02, gz], 0.08, 1);
+    b.beam([gx, y, gz], [gx, y + lift - 0.2, gz], 0.011, 0);
+    if (i < 8) card([gx, y + lift, gz], 0.32, 0.2, -1, 0.06, 0.012);
   }
   return b.finish("wanderlust");
 }
 
-/** Experience: a slim mast with one built-out floor per job, reached in order as the timeline is. */
-function buildMast(): Form {
-  const b = new FormBuilder(83, { min: [-2, -4.6, -2], max: [2, 4.6, 2] });
-  const { half, bottom, top, prejestY, thoughtflowY } = MAST;
-  const levels = 18;
-  let prev: V3[] | null = null;
-  for (let i = 0; i < levels; i++) {
-    const y = bottom + (i / (levels - 1)) * (top - bottom);
-    const rect = rectAt(y, half, half, 0);
-    b.polyline(rect, i % 4 === 0 ? 0.024 : 0.012, 0, true);
-    if (prev) {
-      for (let c = 0; c < 4; c++) b.beam(prev[c], rect[c], 0.016, 0);
-      b.beam(prev[i % 4], rect[(i + 1) % 4], 0.006, 0);
-      b.path([0, prev[0][1], 0], [0, y, 0], i * 0.05);
-    }
-    prev = rect;
-  }
-
-  // Prejest-HR: the Leave and Attendance module, one wing each.
-  const slab = (y: number, r: number, group: number) => {
-    b.polyline(rectAt(y, r, r * 0.6, 0), 0.024, group, true);
-    b.panel([0, y, 0], [r, 0, 0], [0, 0, r * 0.6]);
+/**
+ * Experience: a career drawn like version history. A conceptual graph, not a real repository. Groups: 0 the main line,
+ * 1 the Prejest-HR branch, 2 the Thought-Flow Media work. The poses clip it bottom-up, so scrolling draws it.
+ */
+function buildGitGraph(): Form {
+  const b = new FormBuilder(83, { min: [-3, -3.6, -2], max: [3, 3.8, 2] });
+  const { start, prejestFork, leave, attendance, merge, thoughtflow, now, teams } = GIT;
+  const rail = (a: V3, c: V3, group: number, phase = 0, t = 0.09) => {
+    b.beam(a, c, t, group);
+    b.route([a, along(a, c, 0.5), c], phase, 0.1);
   };
-  slab(prejestY, 2.25, 1);
-  // Leave: a calendar, laid flat.
-  const [lx, ly, lz] = leaveWing;
-  for (let i = 0; i <= 5; i++) b.beam([lx - 0.6 + i * 0.24, ly + 0.02, lz - 0.48], [lx - 0.6 + i * 0.24, ly + 0.02, lz + 0.48], 0.006, 1);
-  for (let i = 0; i <= 4; i++) b.beam([lx - 0.6, ly + 0.02, lz - 0.48 + i * 0.24], [lx + 0.6, ly + 0.02, lz - 0.48 + i * 0.24], 0.006, 1);
-  [[1, 1], [2, 1], [3, 2]].forEach(([c, r]) => b.node([lx - 0.6 + (c + 0.5) * 0.24, ly + 0.04, lz - 0.48 + (r + 0.5) * 0.24], 0.07, 1));
-  // Attendance: a day's marks, standing in a row.
-  const [ax, ay, az] = attendanceWing;
-  [0.3, 0.42, 0.36, 0.48, 0.4].forEach((h, i) => {
-    const x = ax - 0.5 + i * 0.25;
-    b.beam([x, ay, az], [x, ay + h, az], 0.03, 1);
-    b.node([x, ay + h, az], 0.06, 1);
-  });
-  b.route([[half, prejestY + 0.02, 0], [ax - 0.5, ay + 0.02, az]], 0, 0.06);
-  b.route([[-half, prejestY + 0.02, 0], [lx + 0.6, ly + 0.02, lz]], 0.3, 0.06);
+  const curve = (a: V3, c: V3, group: number, phase = 0) => {
+    const pts: V3[] = Array.from({ length: 9 }, (_, i) => {
+      const t = i / 8;
+      const e = t * t * (3 - 2 * t);
+      return [a[0] + (c[0] - a[0]) * e, a[1] + (c[1] - a[1]) * t, a[2] + (c[2] - a[2]) * e] as V3;
+    });
+    b.polyline(pts, 0.065, group);
+    b.route(pts, phase, 0.05);
+  };
+  const commit = (at: V3, r: number, group: number) => {
+    b.ring(at, r, r * 0.34, r * 0.32, 8, group);
+    b.block(at, [r * 0.72, r * 0.26, r * 0.72], Math.PI / 4, group);
+    b.node(plus(at, [0, r * 0.3, 0]), r * 0.68, group);
+  };
 
-  // Thought-Flow Media: one hub and the three teams it coordinates.
-  const ringPts: V3[] = Array.from({ length: 24 }, (_, i) => {
-    const a = (i / 24) * Math.PI * 2;
-    return [Math.cos(a) * 1.65, thoughtflowY, Math.sin(a) * 1.65];
-  });
-  b.polyline(ringPts, 0.012, 2, true);
-  b.node([0, thoughtflowY, 0], 0.2, 2);
-  TEAM_ANGLES.forEach((a, i) => {
-    const p = teamPoint(a);
-    b.beam([0, thoughtflowY, 0], p, 0.02, 2);
-    b.node(p, 0.14, 2);
-    b.route([[0, thoughtflowY, 0], p], i * 0.2, 0.06);
-  });
-  b.panel([0, thoughtflowY, 0], [1.65, 0, 0], [0, 0, 1.65]);
+  // The main line.
+  const mainAt = (y: number): V3 => [0, y, 0];
+  rail(mainAt(GIT.bottom), mainAt(prejestFork), 0, 0);
+  rail(mainAt(prejestFork), mainAt(merge), 0, 0.2);
+  rail(mainAt(merge), mainAt(thoughtflow), 1, 0.4);
+  rail(mainAt(thoughtflow), mainAt(now), 2, 0.55);
+  commit(mainAt(start), 0.24, 0);
 
-  return b.finish("mast");
+  // Prejest-HR: a branch with two commits, merged back when the internship ended.
+  commit(mainAt(prejestFork), 0.38, 1);
+  curve(mainAt(prejestFork), leave, 1, 0.1);
+  rail(leave, attendance, 1, 0.3, 0.065);
+  curve(attendance, mainAt(merge), 1, 0.4);
+  commit(leave, 0.3, 1);
+  commit(attendance, 0.3, 1);
+  commit(mainAt(merge), 0.26, 1);
+
+  // Thought-Flow Media: the current head, with the three teams it coordinates branching beside it.
+  commit(mainAt(thoughtflow), 0.42, 2);
+  teams.forEach(({ at }, i) => {
+    curve(mainAt(at[1] - 0.33), at, 2, 0.55 + i * 0.12);
+    curve(at, mainAt(at[1] + 0.33), 2, 0.75 + i * 0.12);
+    commit(at, 0.22, 2);
+  });
+  commit(mainAt(now), 0.34, 2);
+  // Head is still moving: the line runs on past the last commit.
+  b.beam(mainAt(now), mainAt(GIT.top), 0.02, 2);
+  b.route([mainAt(now), mainAt(GIT.top)], 0.9, 0.08);
+
+  return b.finish("gitgraph");
 }
 
+/** Skills: clusters of real technologies, joined by how they are actually used together. Tags come from layouts.ts. */
 function buildConstellation(): Form {
-  const b = new FormBuilder(89, { min: [-5, -3, -3], max: [5, 3, 2] });
-  let tag = 0;
+  const b = new FormBuilder(89, { min: [-5, -3, -3], max: [5.5, 3, 2] });
   const byId = new Map(skillLayout.map((s) => [s.id, s]));
 
   clusters.forEach((cluster) => {
     const { c, r } = clusterLayout[cluster.id];
-    const members = skillLayout.filter((s) => s.cluster === cluster.id);
-    b.node(c, 0.07, 4);
+    const emerging = !!cluster.emerging;
+    const group = emerging ? 1 : 0;
 
-    const ring: V3[] = [];
-    for (let i = 0; i < 28; i++) {
-      const a = (i / 28) * Math.PI * 2;
-      ring.push([c[0] + Math.cos(a) * r * 1.2, c[1] + Math.sin(a) * r * 0.92, c[2] + Math.sin(a * 2) * 0.28]);
+    // A small machined hub at the middle of each cluster. The one still being learned is drawn open and dashed.
+    if (emerging) {
+      b.ring(c, 0.24, 0.05, 0.05, 8, group);
+    } else {
+      b.block(c, [0.42, 0.1, 0.42], Math.PI / 4, group);
+      b.ring(c, 0.3, 0.05, 0.04, 8, group);
     }
-    b.polyline(ring, 0.004, 5, true);
-    b.panel([c[0], c[1], c[2] - 0.35], [r * 1.45, 0, 0], [0, r * 1.15, 0]);
+    b.node(c, 0.12, emerging ? 1 : 4);
 
-    members.forEach((s) => {
-      b.node(s.position, 0.075, 3);
-      const t = tag++;
-      b.beam(c, s.position, 0.005, 6, t);
-      b.route([c, s.position], t / 18, 0.2);
+    const ring: V3[] = Array.from({ length: 28 }, (_, i) => {
+      const a = (i / 28) * Math.PI * 2;
+      return [c[0] + Math.cos(a) * r * 1.2, c[1] + Math.sin(a) * r * 0.92, c[2] + Math.sin(a * 2) * 0.28];
     });
+    ring.forEach((p, i) => {
+      if (emerging && i % 2 === 0) return;
+      b.beam(p, ring[(i + 1) % ring.length], 0.006, group);
+    });
+  });
+
+  skillLayout.forEach((s, t) => {
+    b.node(s.position, 0.1, clusters.find((c) => c.id === s.cluster)?.emerging ? 1 : 3, t);
+    const { c } = clusterLayout[s.cluster];
+    b.beam(c, s.position, 0.008, 0, t);
+    b.route([c, s.position], t / 21, 0.2, t);
   });
 
   skillLinks.forEach(([from, to], i) => {
     const P = byId.get(from);
     const Q = byId.get(to);
     if (!P || !Q) return;
-    const t = tag++;
+    const tag = skillLinkTag(i);
     const A = P.position;
     const B = Q.position;
     const lift = 0.35 + (i % 3) * 0.12;
     const m1: V3 = [A[0] + (B[0] - A[0]) * 0.33, A[1] + (B[1] - A[1]) * 0.33, A[2] + (B[2] - A[2]) * 0.33 + lift];
     const m2: V3 = [A[0] + (B[0] - A[0]) * 0.66, A[1] + (B[1] - A[1]) * 0.66, A[2] + (B[2] - A[2]) * 0.66 + lift];
-    b.beam(A, m1, 0.007, 6, t);
-    b.beam(m1, m2, 0.007, 6, t);
-    b.beam(m2, B, 0.007, 6, t);
-    b.route([A, m1, m2, B], i / skillLinks.length, 0.1);
+    b.polyline([A, m1, m2, B], 0.007, 0, false, tag);
+    b.route([A, m1, m2, B], QUIET, 0.1, tag);
   });
 
   return b.finish("constellation");
 }
 
-/** Gold. Both forms hold up BloodLink's own network: on an obelisk for the prize, on a screen for the presentation. */
-function buildPodium(): Form {
-  const b = new FormBuilder(101, { min: [-6, -3, -3], max: [6, 3.5, 3] });
-  const X1 = -3.4;
+/**
+ * AI and ML: input, hidden and output layers, thin and orderly. Only a few routes carry a signal at any time. Every
+ * connection also has a quiet line of its own, so hovering a neuron can light exactly the ones it touches.
+ */
+function buildNeural(collapse = 1): Form {
+  const b = new FormBuilder(97, { min: [-4, -3, -2], max: [4, 3, 2] });
+  const at = (p: V3): V3 => [p[0] * collapse, p[1] * collapse, p[2] * collapse];
+  neurons.forEach((n, i) => b.node(at(n.at), n.layer === 0 ? 0.26 : n.layer === 3 ? 0.26 : 0.22, n.layer === 0 ? 1 : n.layer === 3 ? 2 : 0, i));
 
-  // Form 1: first prize.
-  const levels = 13;
-  let prev: V3[] | null = null;
-  for (let i = 0; i < levels; i++) {
-    const f = i / (levels - 1);
-    const y = -2.4 + f * 4.3;
-    const r = 0.95 * Math.pow(1 - f, 1.25) + 0.1;
-    const rect = rectAt(y, r, r, f * 0.5, X1);
-    b.polyline(rect, 0.03 - f * 0.012, 0, true);
-    if (prev) for (let c = 0; c < 4; c++) b.beam(prev[c], rect[c], 0.022 - f * 0.01, 0);
-    if (i < 3) b.quad(rect[0], rect[1], rect[2], rect[3]);
-    prev = rect;
-  }
-  // The prize is for the project, so its network is what stands on top.
-  const network = (cx: number, cy: number, cz: number, s: number, group: number, r: number) => {
-    const pts = miniNetwork.map(([x, y, z]) => [cx + x * s, cy + y * s, cz + z * s] as V3);
+  synapses.forEach(([p, q], s) => {
+    const A = at(neurons[p].at);
+    const B = at(neurons[q].at);
+    b.beam(A, B, 0.006, 0, synapseTag(s));
+    b.path(A, B, QUIET, synapseTag(s));
+  });
+
+  // Each layer rests in a fine ring, which is what shows the depth once the camera moves.
+  [0, 1, 2, 3].forEach((l) => {
+    const { x, r, depth } = neuralRing(l);
+    const pts: V3[] = Array.from({ length: 24 }, (_, i) => {
+      const a = (i / 24) * Math.PI * 2;
+      return at([x, Math.sin(a) * r, Math.cos(a) * r * depth]);
+    });
+    b.polyline(pts, 0.011, 1, true);
+  });
+
+  // The few signals that travel: start to finish, so a pulse can be followed all the way across.
+  const byLayer = [0, 1, 2, 3].map((l) => neurons.flatMap((n, i) => (n.layer === l ? [i] : [])));
+  [0, 1, 2, 3, 5].forEach((a, i) => {
+    const hops = byLayer.map((ids, l) => at(neurons[ids[(a * (l + 2)) % ids.length]].at));
+    b.route(hops, i * 0.19, 0.2);
+  });
+
+  return b.finish("neural");
+}
+
+/**
+ * Achievements: the same small network twice, in gold. On the left an award ring closes around it; on the right it
+ * broadcasts outward, because the second achievement is having presented it to an audience.
+ */
+function buildMilestones(): Form {
+  const b = new FormBuilder(101, { min: [-10, -3, -3], max: [10, 3.5, 3] });
+  const network = (cx: number, group: number, r: number, scale: number) => {
+    const pts = miniNetwork.map(([x, y, z]) => [cx + x * scale, MILESTONE.y + y * scale, z * scale] as V3);
     pts.forEach((p, i) => {
-      b.node(p, i === 0 ? r * 1.8 : r, group);
+      b.node(p, i === 0 ? r * 2 : r, group);
       if (i > 0) {
-        b.beam(pts[0], p, 0.012, group);
+        b.beam(pts[0], p, 0.016, group);
         b.route([p, pts[0]], i * 0.15, 0.05);
       }
     });
+    pts.slice(1).forEach((p, i, rest) => b.beam(p, rest[(i + 1) % rest.length], 0.006, group));
   };
-  network(X1, PODIUM.apexY, 0, 1, 0, 0.14);
-  // Laurel arcs.
-  for (const side of [-1, 1]) {
-    const pts: V3[] = [];
-    for (let i = 0; i <= 14; i++) {
-      const a = (i / 14) * Math.PI * 0.78 - 0.45;
-      pts.push([X1 + side * Math.cos(a) * 2.05, -0.15 + Math.sin(a) * 2.5, side * 0.15]);
-    }
-    b.polyline(pts, 0.014, 0);
-    b.route(pts, side > 0 ? 0 : 0.5, 0.04);
-    pts.forEach((p, i) => {
-      if (i % 2 === 1) b.node(p, 0.05, 0);
+
+  // First prize: a machined ring closing around the winning network.
+  const X1 = MILESTONE.left;
+  const Y = MILESTONE.y;
+  network(X1, 0, 0.14, 1);
+  const ringAt = (x: number, r: number, n: number): V3[] =>
+    Array.from({ length: n }, (_, i) => {
+      const a = (i / n) * Math.PI * 2;
+      return [x + Math.cos(a) * r, Y + Math.sin(a) * r, 0] as V3;
     });
-  }
-
-  // Form 2: a stepped dais facing an amphitheatre of seats.
-  const X2 = 3.4;
-  [1.5, 1.1, 0.72].forEach((r, i) => {
-    const y = -2.2 + i * 0.26;
-    b.box([X2, y, -0.9], [r * 2, 0.24, r * 1.2], 0.016, 1);
-    b.panel([X2, y + 0.12, -0.9], [r, 0, 0], [0, 0, r * 0.6]);
+  const outer = ringAt(X1, 1.92, 24);
+  outer.forEach((p, i) => b.beam(p, outer[(i + 1) % outer.length], 0.11, 0));
+  const fine = ringAt(X1, 2.12, 24);
+  fine.forEach((p, i) => b.beam(p, fine[(i + 1) % fine.length], 0.008, 0));
+  b.route([...fine, fine[0]], 0, 0.03);
+  outer.forEach((p, i) => {
+    if (i % 6 === 0) b.node(p, 0.13, 0);
   });
-  // The screen behind the presenter shows the same network.
-  const SY = PODIUM.screenY;
-  b.polyline(
-    [
-      [X2 - 1.15, SY - 0.68, -1.7],
-      [X2 + 1.15, SY - 0.68, -1.7],
-      [X2 + 1.15, SY + 0.68, -1.7],
-      [X2 - 1.15, SY + 0.68, -1.7],
-    ],
-    0.02,
-    1,
-    true,
-  );
-  b.panel([X2, SY, -1.72], [1.15, 0, 0], [0, 0.68, 0], 0.22);
-  network(X2, SY, -1.68, 1.1, 1, 0.1);
-  // The standing presenter, reduced to a slab of light.
-  const sy = -1.42;
-  b.box([X2, sy + 0.72, -0.9], [0.22, 1.44, 0.1], 0.012, 1);
-  b.panel([X2, sy + 0.72, -0.85], [0.11, 0, 0], [0, 0.72, 0], 1);
-  b.node([X2, sy + 1.68, -0.9], 0.2, 1);
-  for (let ring = 0; ring < 6; ring++) {
-    const r = 1.75 + ring * 0.46;
-    const y = -2.28 + ring * 0.2;
-    const pts: V3[] = [];
-    for (let s = 0; s <= 16; s++) {
-      const a = Math.PI * (0.13 + (s / 16) * 0.74);
-      pts.push([X2 + Math.cos(a) * r, y, -0.9 + Math.sin(a) * r * 0.9]);
-    }
-    b.polyline(pts, 0.012, 1);
-    if (ring % 2 === 1) b.route(pts, ring * 0.12, 0.03);
-    for (let s = 1; s < 16; s += 3) {
-      b.node(pts[s], 0.035, 1);
-    }
-  }
-  return b.finish("podium");
+
+  // Presented: the network sending outward in widening arcs, each with listeners along it.
+  const X2 = MILESTONE.right;
+  network(X2, 1, 0.12, 0.82);
+  [1.3, 1.82, 2.34].forEach((r, k) => {
+    [-1, 1].forEach((side) => {
+      const pts: V3[] = Array.from({ length: 11 }, (_, i) => {
+        const a = (i / 10 - 0.5) * 1.5;
+        return [X2 + side * Math.cos(a) * r, Y + Math.sin(a) * r, 0] as V3;
+      });
+      b.polyline(pts, 0.014 - k * 0.002, 1);
+      b.route(pts.slice(0, 6).reverse(), 0.1 + k * 0.2, 0.03);
+      b.route(pts.slice(5), 0.1 + k * 0.2, 0.03);
+      pts.forEach((p, i) => {
+        if (i % 2 === 1) b.node(p, 0.07, 1);
+      });
+    });
+  });
+  return b.finish("milestones");
 }
 
-/** Education: two levels, school and then the degree, with the base of the hero's tower standing on top of them. */
-function buildFoundation(): Form {
-  const b = new FormBuilder(113, { min: [-3.4, -2.4, -3.4], max: [3.4, 1, 3.4] });
-  const { school, degree, schoolR, degreeR } = FOUNDATION;
-  const slab = (y: number, r: number, t: number, group: number) => {
-    const low = rectAt(y - 0.14, r, r, 0);
-    const high = rectAt(y, r, r, 0);
-    b.polyline(low, t, group, true);
-    b.polyline(high, t, group, true);
-    for (let c = 0; c < 4; c++) b.beam(low[c], high[c], t, group);
-    b.panel([0, y, 0], [r, 0, 0], [0, 0, r]);
+/** Education: a graph with two large nodes, the school and then the degree, each surrounded by what it gave. */
+function buildKnowledge(): Form {
+  const b = new FormBuilder(113, { min: [-4, -3, -2], max: [4.5, 3, 2] });
+  const { school, degree, schoolInfo, degreeInfo } = KNOWLEDGE;
+
+  const hub = (at: V3, r: number, group: number) => {
+    b.block(plus(at, [0, r * 0.32, 0]), [r * 1.15, r * 0.2, r * 1.15], Math.PI / 4, group);
+    b.block(plus(at, [0, -r * 0.32, 0]), [r * 1.15, r * 0.2, r * 1.15], Math.PI / 4, group);
+    b.ring(at, r, r * 0.3, r * 0.2, 10, group);
+    b.panel(at, [r * 0.62, 0, 0], [0, 0, r * 0.62], 0.75);
+    b.node(plus(at, [0, 0, r * 0.05]), r * 0.5, group);
   };
-  slab(school, schoolR, 0.022, 0);
-  slab(degree, degreeR, 0.03, 1);
+  hub(school, 0.54, 0);
+  hub(degree, 0.76, 1);
 
-  // Columns carrying the degree on the school.
-  for (const [x, z] of [[-1, -1], [1, -1], [1, 1], [-1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]]) {
-    b.beam([x * degreeR * 0.9, school, z * degreeR * 0.9], [x * degreeR * 0.9, degree - 0.14, z * degreeR * 0.9], 0.02, 0);
-  }
+  // The route from one to the other, drawn bright so the graph reads in a single glance.
+  const route: V3[] = Array.from({ length: 13 }, (_, i) => {
+    const t = i / 12;
+    const e = t * t * (3 - 2 * t);
+    return [school[0] + (degree[0] - school[0]) * t, school[1] + (degree[1] - school[1]) * e, school[2] + (degree[2] - school[2]) * t + Math.sin(t * Math.PI) * 0.5] as V3;
+  });
+  b.polyline(route, 0.05, 1);
+  b.route(route, 0, 0.05);
+  b.route(route.slice().reverse(), 0.5, 0.05);
 
-  // The first floors of the tower, using its real plan and twist.
-  const floors = 7;
-  let prev: V3[] | null = null;
-  let prevCore: V3[] | null = null;
-  for (let i = 0; i < floors; i++) {
-    const y = degree + (i / (floors - 1)) * 1.75;
-    const { w, d, twist } = outerRect(i / (TOWER.floors - 1));
-    const outer = rectAt(y, w, d, twist);
-    const core = rectAt(y, TOWER.column, TOWER.column, 0);
-    // Fades out as it rises: this is only the start of what stands on the foundation.
-    const t = 0.024 * (1 - (i / floors) * 0.75);
-    b.polyline(outer, t, 1, true);
-    b.polyline(core, t * 0.7, 1, true);
-    if (prev && prevCore) {
-      for (let c = 0; c < 4; c++) {
-        b.beam(prev[c], outer[c], t, 1);
-        b.beam(prevCore[c], core[c], t * 0.7, 1);
-      }
-    }
-    prev = outer;
-    prevCore = core;
+  const info = (at: V3, hubAt: V3, group: number, phase: number) => {
+    b.panel(at, [0.3, 0, 0.04], [0, 0.17, 0], 0.07);
+    b.polyline([[at[0] - 0.3, at[1] - 0.17, at[2] - 0.04], [at[0] + 0.3, at[1] - 0.17, at[2] + 0.04], [at[0] + 0.3, at[1] + 0.17, at[2] + 0.04], [at[0] - 0.3, at[1] + 0.17, at[2] - 0.04]], 0.013, group, true);
+    b.node(at, 0.1, group);
+    b.beam(hubAt, at, 0.016, group);
+    b.route([hubAt, along(hubAt, at, 0.5), at], phase, 0.08);
+  };
+  schoolInfo.forEach((n, i) => info(n.at, school, 0, i * 0.3));
+  degreeInfo.forEach((n, i) => info(n.at, degree, 1, 0.3 + i * 0.3));
+
+  // Smaller unlabelled nodes around the two hubs, so it reads as part of something larger.
+  const extras: V3[] = [];
+  for (let i = 0; i < 22; i++) {
+    const from = along(school, degree, b.random());
+    const a = b.random() * Math.PI * 2;
+    const r = 0.9 + b.random() * 1.2;
+    const p: V3 = [from[0] + Math.cos(a) * r * 0.9, from[1] + Math.sin(a) * r * 0.8, from[2] + (b.random() - 0.5) * 1.4];
+    extras.push(p);
+    b.node(p, 0.045 + b.random() * 0.03, i % 2);
+    b.beam(from, p, 0.004, i % 2);
+    if (i % 5 === 0) b.path(from, p, QUIET);
   }
-  b.route([[0, school, 0], [0, degree, 0], [0, degree + 1.75, 0]], 0, 0.2);
-  [[-schoolR, schoolR], [schoolR, schoolR], [schoolR, -schoolR], [-schoolR, -schoolR]].forEach(([x, z]) => b.node([x, school, z], 0.07, 0));
-  [[-degreeR, degreeR], [degreeR, degreeR], [degreeR, -degreeR], [-degreeR, -degreeR]].forEach(([x, z]) => b.node([x, degree, z], 0.09, 1));
-  return b.finish("foundation");
+  extras.forEach((p, i) => {
+    if (i % 3 === 0) b.beam(p, extras[(i + 7) % extras.length], 0.003, 0);
+  });
+  return b.finish("knowledge");
 }
 
-/** The closing form: an axis of arches passing everything built so far, ending at an empty plot. */
-function buildPortal(): Form {
-  const b = new FormBuilder(127, { min: [-3, -2.6, -16], max: [3, 3.2, 2] });
-  const arches = 10;
-  const spacing = 1.35;
-  const W = 2.05;
-  const base = -2.5;
-  const spring = 0.9;
-  const all: V3[][] = [];
-  for (let i = 0; i < arches; i++) {
-    const z = 1.2 - i * spacing;
-    const pts: V3[] = [[-W, base, z], [-W, spring, z]];
-    for (let s = 1; s < 14; s++) {
-      const a = Math.PI - (s / 14) * Math.PI;
-      pts.push([Math.cos(a) * W, spring + Math.sin(a) * W, z]);
+/** Contact: the hero's core again, with every stream of the page arriving at it. */
+function buildConvergence(): Form {
+  const b = new FormBuilder(127, { min: [-6, -3.5, -3], max: [6, 4.5, 2] });
+  coreBody(b, [0, 0, 0], 0.9);
+  CONVERGE.streams.forEach(({ from }, s) => {
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2;
+      const start: V3 = [from[0] + Math.cos(a) * 0.65 * (1 + (i % 3) * 0.3), from[1] + Math.sin(a) * 0.65, from[2] + Math.sin(a * 2) * 0.5];
+      const end: V3 = [from[0] * 0.2, from[1] * 0.2, from[2] * 0.2];
+      const pts: V3[] = Array.from({ length: 7 }, (_, k) => {
+        const t = k / 6;
+        const e = 1 - (1 - t) * (1 - t);
+        return [start[0] + (end[0] - start[0]) * e, start[1] + (end[1] - start[1]) * t, start[2] + (end[2] - start[2]) * e] as V3;
+      });
+      b.polyline(pts, 0.009, 0);
+      b.route(pts, s * 0.3 + i * 0.11, 0.07);
+      b.node(start, 0.1, s % 2);
     }
-    pts.push([W, spring, z], [W, base, z]);
-    all.push(pts);
-    const t = i === 0 ? 0.07 : 0.04;
-    b.polyline(pts, t, 0);
-    if (i < 5) {
-      const inner = pts.map((p) => [p[0] * 0.93, p[1] <= base ? base : spring + (p[1] - spring) * 0.93, z] as V3);
-      b.polyline(inner, 0.008, 0);
-    }
-  }
-  for (let i = 0; i < arches - 1; i++) {
-    for (const k of [1, 4, 8, 12, 15]) {
-      b.beam(all[i][k], all[i + 1][k], k === 8 ? 0.02 : 0.012, 0);
-    }
-    b.beam(all[i][0], all[i + 1][0], 0.02, 0);
-    b.beam(all[i][16], all[i + 1][16], 0.02, 0);
-  }
-  // The five pieces of real work, standing along the way.
-  THRESHOLD.stops.forEach(({ at }) => {
-    const [x, y, z] = at;
-    b.box([x, y, z], [0.72, 0.9, 0.5], 0.014, 0);
-    b.beam([x, y - 0.45, z], [x, THRESHOLD.base, z], 0.018, 0);
-    b.panel([x, y, z + 0.25], [0.3, 0, 0], [0, 0.38, 0], 0.4);
-    b.node([x, y + 0.6, z], 0.08, 1);
+    b.ring(from, 0.34, 0.08, 0.08, 8, 0);
+    b.node(from, 0.2, 1);
   });
-  // The plot at the end has been marked out, and nothing has been built on it yet.
-  const [px, py, pz] = THRESHOLD.plot;
-  const plot: V3[] = [
-    [px - 1.15, py + 0.02, pz - 0.9],
-    [px + 1.15, py + 0.02, pz - 0.9],
-    [px + 1.15, py + 0.02, pz + 0.9],
-    [px - 1.15, py + 0.02, pz + 0.9],
-  ];
-  b.polyline(plot, 0.03, 0, true);
-  b.route([...plot, plot[0]], 0, 0.05);
-  plot.forEach((p) => b.beam(p, [p[0], p[1] + 0.8, p[2]], 0.016, 0));
-  plot.forEach((p) => b.node([p[0], p[1] + 0.8, p[2]], 0.06, 1));
-
-  // A single line of light leading through the threshold.
-  const axis: V3[] = [];
-  for (let i = 0; i <= 26; i++) axis.push([0, base + 0.015, 2.6 - (i / 26) * 19]);
-  b.route(axis, 0, 0.03);
-  [-1.1, 1.1].forEach((x, side) => {
-    const rail: V3[] = [];
-    for (let i = 0; i <= 18; i++) rail.push([x, base + 0.015, 1.2 - (i / 18) * 15]);
-    b.route(rail, side * 0.5, 0.05);
-  });
-  for (let i = 0; i < arches; i++) {
-    const z = 1.2 - i * spacing;
-    b.node([0, spring + W, z], 0.06, 0);
-    b.node([-1.1, base + 0.04, z], 0.05, 0);
-    b.node([1.1, base + 0.04, z], 0.05, 0);
-  }
-  b.panel(
-    [0, base, 1.2 - ((arches - 1) * spacing) / 2],
-    [W, 0, 0],
-    [0, 0, ((arches - 1) * spacing) / 2],
-  );
-  return b.finish("portal");
+  return b.finish("convergence");
 }
 
 function mapForm(
@@ -1149,6 +1127,7 @@ function mapForm(
     point(out.beams, o);
     point(out.beams, o + 3);
     out.beams[o + 6] *= thickness;
+    out.beams[o + 7] *= thickness;
   }
   for (let i = 0; i < COUNT.paths; i++) {
     const o = i * STRIDE.paths;
@@ -1179,65 +1158,61 @@ function mapForm(
   return out;
 }
 
-/** The start of the assembly: every member of the tower, flung outward along its own direction. */
-function buildScatter(tower: Form): Form {
-  const rng = mulberry(7);
-  const out = mapForm(tower, (x, y, z) => [x, y, z]);
+/**
+ * The start of the assembly. The core barely moves, so it is what's seen first; every other part waits further out
+ * along its own direction, the further from the core the further it has to come.
+ */
+function buildScatter(core: Form): Form {
+  const out = mapForm(core, (x, y, z) => [x, y, z]);
   for (let i = 0; i < COUNT.beams; i++) {
     const o = i * STRIDE.beams;
-    const ax = rng() * Math.PI * 2;
-    const dist = 5 + rng() * 9;
-    const dx = Math.cos(ax) * dist;
-    const dy = (rng() - 0.5) * 9;
-    const dz = Math.sin(ax) * dist;
+    const mx = (out.beams[o] + out.beams[o + 3]) / 2;
+    const my = (out.beams[o + 1] + out.beams[o + 4]) / 2;
+    const mz = (out.beams[o + 2] + out.beams[o + 5]) / 2;
+    const dist = Math.hypot(mx, my, mz);
+    const push = Math.max(0, dist - 1.9) * 1.1;
+    if (dist < 1e-3) continue;
     for (const k of [0, 3]) {
-      out.beams[o + k] += dx;
-      out.beams[o + k + 1] += dy;
-      out.beams[o + k + 2] += dz;
+      out.beams[o + k] += (mx / dist) * push;
+      out.beams[o + k + 1] += (my / dist) * push;
+      out.beams[o + k + 2] += (mz / dist) * push;
     }
-    out.beams[o + 6] *= 0.3;
   }
-  for (let i = 0; i < COUNT.paths; i++) {
-    const o = i * STRIDE.paths;
-    out.paths[o + 3] = out.paths[o];
-    out.paths[o + 4] = out.paths[o + 1];
-    out.paths[o + 5] = out.paths[o + 2];
-  }
-  for (let i = 0; i < COUNT.panels; i++) {
-    const o = i * STRIDE.panels;
-    for (let k = 3; k < 9; k++) out.panels[o + k] = 0;
-  }
-  for (let i = 0; i < COUNT.nodes; i++) out.nodes[i * STRIDE.nodes + 3] = 0;
   return out;
 }
 
 export type FormId =
   | "scatter"
-  | "tower"
-  | "strata"
+  | "core"
+  | "ecosystemPacked"
+  | "ecosystem"
   | "bloodlink"
   | "prolink"
   | "wanderlust"
-  | "mast"
+  | "gitgraph"
   | "constellation"
-  | "podium"
-  | "foundation"
-  | "portal";
+  | "neuralSeed"
+  | "neural"
+  | "milestones"
+  | "knowledge"
+  | "convergence";
 
 export function buildForms(): Record<FormId, Form> {
-  // Heavier members than the other forms: the opening is where the steel has to read as steel.
-  const tower = mapForm(buildTower(), (x, y, z) => [x, y, z], 1.45);
+  const core = buildCore();
   return {
-    scatter: buildScatter(tower),
-    tower,
-    strata: buildStrata(),
+    scatter: buildScatter(core),
+    core,
+    ecosystemPacked: buildEcosystem(ECOSYSTEM.packed),
+    ecosystem: buildEcosystem(ECOSYSTEM.spread),
     bloodlink: buildBloodLink(),
     prolink: buildProLink(),
     wanderlust: buildWanderlust(),
-    mast: buildMast(),
+    gitgraph: buildGitGraph(),
     constellation: buildConstellation(),
-    podium: buildPodium(),
-    foundation: buildFoundation(),
-    portal: buildPortal(),
+    neuralSeed: buildNeural(0.28),
+    neural: buildNeural(),
+    milestones: buildMilestones(),
+    knowledge: buildKnowledge(),
+    convergence: buildConvergence(),
   };
 }

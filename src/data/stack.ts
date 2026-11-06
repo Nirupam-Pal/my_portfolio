@@ -1,51 +1,45 @@
-import { experience } from "./experience";
-import { projects, type ProjectId } from "./projects";
-
 /**
- * What the hero tower is made of. The service core carries the stack, database at the bottom and frontend at the
- * top, and every module plugged into the tower is a real piece of work wired to the technologies it uses.
+ * The system the 3D models are drawn from: what each layer of a full-stack application does, and what Nirupam uses
+ * for it. The hero shows these as one working machine, and the About section pulls the same layers apart.
  */
-export const tiers = [
-  { id: "databases", label: "Databases", tech: ["SQL", "MongoDB"] },
-  { id: "backend", label: "Backend", tech: ["Node.js", "Express.js", "NestJS", "Socket.IO"] },
-  { id: "apis", label: "APIs & Auth", tech: ["RESTful APIs", "JWT Authentication"] },
-  { id: "frontend", label: "Frontend", tech: ["Next.js", "React.js", "Angular", "TypeScript", "Tailwind CSS", "EJS", "Bootstrap"] },
+export const stackLayers = [
+  {
+    id: "frontend",
+    label: "Frontend",
+    tech: ["React", "Next.js", "Angular"],
+    role: "What people see and use.",
+  },
+  {
+    id: "api",
+    label: "APIs & Authentication",
+    tech: ["REST APIs", "JWT", "Socket.IO"],
+    role: "How the layers talk, and who is allowed to.",
+  },
+  {
+    id: "backend",
+    label: "Backend",
+    tech: ["Node.js", "Express.js", "NestJS"],
+    role: "Where the rules and the processing live.",
+  },
+  {
+    id: "database",
+    label: "Database",
+    tech: ["MongoDB", "SQL"],
+    role: "Where the data is kept and found again.",
+  },
+  {
+    id: "problem",
+    label: "Problem Solving & System Design",
+    tech: [],
+    role: "Deciding what to build, and how the parts fit together.",
+  },
 ] as const;
 
-export const techList: readonly { label: string; tier: number; slot: number; slots: number }[] = tiers.flatMap((tier, t) =>
-  tier.tech.map((label, slot) => ({ label, tier: t, slot, slots: tier.tech.length })),
-);
-
-const project = (id: ProjectId) => projects.find((p) => p.id === id)!;
-const job = (id: string) => experience.find((e) => e.id === id)!;
-const stackOf = (id: ProjectId) => project(id).stack;
-
-export interface WorkItem {
-  id: string;
-  label: string;
-  /** Technologies this work is wired to in the tower. Empty when the work is not software. */
-  uses: readonly string[];
-  /** People this work coordinates, drawn in place of technologies. */
-  team?: readonly string[];
-  note: string;
-}
-
-export const work: readonly WorkItem[] = [
-  {
-    id: "bloodlink",
-    label: project("bloodlink").title,
-    // JWT is listed among BloodLink's features rather than its stack line.
-    uses: [...stackOf("bloodlink"), "JWT Authentication"],
-    note: stackOf("bloodlink").join(" / "),
-  },
-  { id: "prolink", label: project("prolink").title, uses: stackOf("prolink"), note: stackOf("prolink").join(" / ") },
-  { id: "wanderlust", label: project("wanderlust").title, uses: stackOf("wanderlust"), note: stackOf("wanderlust").join(" / ") },
-  { id: "prejest", label: job("prejest").company, uses: ["Angular"], note: "Leave and Attendance module / Angular" },
-  {
-    id: "thoughtflow",
-    label: job("thoughtflow").company,
-    uses: [],
-    team: ["Video editors", "Videographers", "Graphic designers"],
-    note: "Coordinating video editors, videographers and graphic designers",
-  },
-];
+/** The parts of the hero's sculpture, in the order its sequence lights them. */
+export const heroSystems = [
+  { id: "frontend", label: "Frontend", note: "React / Next.js / Angular" },
+  { id: "api", label: "APIs & Auth", note: "REST APIs / JWT / Socket.IO" },
+  { id: "backend", label: "Backend", note: "Node.js / Express.js / NestJS" },
+  { id: "database", label: "Database", note: "MongoDB / SQL" },
+  { id: "ai", label: "AI & ML", note: "Currently exploring" },
+] as const;

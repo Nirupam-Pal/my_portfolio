@@ -28,6 +28,7 @@
 :root {
   --gutter: clamp(1.25rem, 3.6vw, 3.5rem);
   --fs-hero: clamp(4.5rem, min(22.4vw, 30svh), 25rem);
+  --fs-hero-wide: clamp(4.5rem, min(16.6vw, 27svh), 20rem);
   --fs-section: clamp(3.4rem, 10.6vw, 11.5rem);
   --fs-title: clamp(2.9rem, 7.6vw, 8.25rem);
   --fs-lead: clamp(1.125rem, 1.45vw, 1.5rem);
@@ -105,6 +106,11 @@ html.lenis body {
   color: var(--color-mute);
 }
 
+.hero-name { font-size: var(--fs-hero); }
+@media (min-width: 1024px) {
+  .hero-name { font-size: var(--fs-hero-wide); }
+}
+
 .heading-section {
   font-size: var(--fs-section);
 }
@@ -118,9 +124,9 @@ html.lenis body {
 .split-line {
   display: block;
   overflow: hidden;
-  /* Keeps ascenders inside the mask without loosening the visual line height. */
-  padding-block: 0.06em;
-  margin-block: -0.06em;
+  /* Keeps ascenders and the tight display tracking inside the mask without loosening the visual spacing. */
+  padding: 0.06em;
+  margin: -0.06em;
 }
 .split-word,
 .split-char {
@@ -177,7 +183,6 @@ html.lenis body {
 }
 
 /* ---------------------------------------- The sideways exhibition, only where it will actually be pinned */
-.exhibit-only { display: none; }
 @media (min-width: 1024px) and (min-height: 600px) and (prefers-reduced-motion: no-preference) {
   .js .exhibit-viewport {
     height: 100svh;
@@ -188,15 +193,6 @@ html.lenis body {
     width: max-content;
     height: 100%;
     will-change: transform;
-  }
-  .js .exhibit-only { display: flex; }
-}
-
-/* Each screenshot is twice as wide as it is tall, so the column width is also what keeps two rows on one screen. */
-@media (min-width: 1024px) {
-  .gallery-grid {
-    grid-template-columns: repeat(2, minmax(0, min(46vw, calc(100svh - 19.5rem))));
-    justify-content: start;
   }
 }
 
@@ -275,6 +271,28 @@ button.model-label-button {
 .model-caption:not([data-step]) > [data-idle],
 .model-caption[data-step="none"] > [data-idle] { opacity: 1; }
 
+/* The layers of the About model: the one held reveals what it does. */
+.layer-row { transition: opacity 0.35s; }
+[data-step]:not([data-step="none"]) .layer-row:not([data-active]) { opacity: 0.45; }
+.layer-role {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.4s var(--ease-expo);
+}
+.layer-role > span { overflow: hidden; }
+.layer-row[data-active] .layer-role,
+.layer-row:hover .layer-role,
+.layer-row:focus-visible .layer-role { grid-template-rows: 1fr; }
+
+/* The skills graph: the held technology and its neighbours stay, the rest step back. */
+.skill-label,
+.skill-category { transition: opacity 0.35s, color 0.35s; }
+.skill-category > span { opacity: 0.8; transition: color 0.35s, opacity 0.35s; }
+.skill-category[data-lit] > span { color: var(--color-paper); opacity: 1; }
+.skill-graph[data-step]:not([data-step="none"]) .skill-label:not([data-lit]) { opacity: 0.28; }
+.skill-graph[data-step]:not([data-step="none"]) .skill-category:not([data-lit]) { opacity: 0.35; }
+.skill-label[data-lit] { color: var(--color-paper); }
+
 .listing-photo {
   transition: opacity 0.5s, filter 0.5s;
 }
@@ -311,7 +329,7 @@ button.model-label-button {
 .wash-dusk { background: linear-gradient(180deg, rgb(70 34 70 / 0.42) 0%, rgb(150 72 44 / 0.34) 48%, transparent 76%); }
 .wash-gold { background: radial-gradient(60% 80% at 68% 50%, rgb(125 92 34 / 0.28), transparent 72%); }
 
-.drawing-grid {
+.page-grid {
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -406,8 +424,7 @@ button.model-label-button {
   transition: width 0.4s var(--ease-expo), height 0.4s var(--ease-expo), background-color 0.3s, border-color 0.3s, opacity 0.3s;
 }
 .cursor-ring[data-state="link"] { width: 3.5rem; height: 3.5rem; border-color: var(--color-paper); }
-.cursor-ring[data-state="view"],
-.cursor-ring[data-state="drag"] {
+.cursor-ring[data-state="view"] {
   width: 5.75rem;
   height: 5.75rem;
   background: var(--color-paper);
@@ -418,8 +435,7 @@ button.model-label-button {
   opacity: 0;
   transition: opacity 0.25s;
 }
-.cursor-ring[data-state="view"] .cursor-label,
-.cursor-ring[data-state="drag"] .cursor-label {
+.cursor-ring[data-state="view"] .cursor-label {
   opacity: 1;
 }
 
@@ -465,11 +481,18 @@ details[open] .details-mark {
   box-shadow: 0 30px 80px -30px rgb(0 0 0 / 0.9);
 }
 
-/* ---------------------------------------- When there is no WebGL, the drawing takes over */
+/* ---------------------------------------- When there is no WebGL, still drawings take over */
 .webgl-fallback { display: none; }
 .no-webgl .webgl-fallback { display: block; }
 .no-webgl .requires-webgl { display: none !important; }
 .no-webgl .skills-list { display: block !important; }
+/* With no network to scroll through, the AI section is an ordinary section with its drawing beside the text. */
+.no-webgl .ai-section { height: auto; }
+.no-webgl .ai-pin {
+  position: relative;
+  height: auto;
+  padding-block: 6rem;
+}
 
 /* ---------------------------------------- Reduced motion */
 @media (prefers-reduced-motion: reduce) {
@@ -493,5 +516,5 @@ details[open] .details-mark {
 }
 
 @media print {
-  #scene, .wash, .drawing-grid, .z-chrome, .z-cursor, .z-transition { display: none !important; }
+  #scene, .wash, .page-grid, .z-chrome, .z-cursor, .z-transition { display: none !important; }
 }

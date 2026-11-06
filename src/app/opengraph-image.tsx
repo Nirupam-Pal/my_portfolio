@@ -9,36 +9,23 @@ export const contentType = "image/png";
 export default async function OpengraphImage() {
   const font = await readFile(join(process.cwd(), "src/assets/fonts/SpaceGrotesk-Bold.woff"));
 
-  // A plain elevation of the tower: floors stepping and twisting upward.
-  const floors = Array.from({ length: 13 }, (_, i) => {
-    const f = i / 12;
-    return {
-      width: 150 + 110 * Math.abs(Math.cos(f * 1.25)) + 30 * Math.sin(f * 4),
-      left: 860 + 18 * Math.sin(f * 6),
-      top: 560 - f * 500,
-    };
+  // A plain drawing of the network: three layers, each joined to the next.
+  const nodes = [0, 1, 2].flatMap((l) => {
+    const count = [3, 4, 2][l];
+    return Array.from({ length: count }, (_, n) => ({ left: 800 + l * 150, top: 315 + (n - (count - 1) / 2) * 110, sky: l !== 1 }));
   });
 
   return new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex", position: "relative", background: "#08090D", color: "#F5F5F7", fontFamily: "Space Grotesk" }}>
-        {floors.map((floor) => (
+        {nodes.map((node) => (
           <div
-            key={floor.top}
-            style={{
-              position: "absolute",
-              left: floor.left - floor.width / 2,
-              top: floor.top,
-              width: floor.width,
-              height: 2,
-              background: "#8B5CF6",
-              opacity: 0.85,
-            }}
+            key={`${node.left}${node.top}`}
+            style={{ position: "absolute", left: node.left - 14, top: node.top - 14, width: 28, height: 28, borderRadius: 14, background: node.sky ? "#38BDF8" : "#8B5CF6" }}
           />
         ))}
-        <div style={{ position: "absolute", left: 860, top: 40, width: 2, height: 550, background: "#38BDF8" }} />
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: 64, height: "100%", width: "100%" }}>
-          <div style={{ fontSize: 26, letterSpacing: 2, color: "#9296A5" }}>THE DIGITAL ARCHITECT</div>
+          <div style={{ fontSize: 26, letterSpacing: 2, color: "#9296A5" }}>THE COMPUTATIONAL UNIVERSE</div>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ fontSize: 148, lineHeight: 0.9, letterSpacing: -6 }}>NIRUPAM</div>
             <div style={{ fontSize: 148, lineHeight: 0.9, letterSpacing: -6 }}>PAL.</div>

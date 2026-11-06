@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
 import { COUNT, STRIDE, type Form, type FormId } from "./geometry";
-import { litTagsFor, skillLayout } from "./layouts";
+import { focusPointFor, litTagsFor } from "./layouts";
 import { POSE_IDS, POSES, type Pose, type PoseId } from "./poses";
 import { sceneStore as store } from "./store";
 
@@ -26,7 +26,25 @@ interface ResolvedPose {
   nodes: THREE.Color[];
 }
 
+/** The whole form breathes as one, so parts stay attached to each other and nothing is rewritten on the CPU. */
+const DRIFT = /* glsl */ `
+  uniform float uDrift;
+  vec3 drifted(vec3 p, float time) {
+    float w = sin(time * 0.42 + p.y * 0.9 + p.x * 0.35);
+    return p + vec3(w * 0.6, sin(time * 0.33 + p.x * 0.7), w * 0.4) * uDrift;
+  }
+`;
+
+/** Everything past this plane isn't drawn yet, which is how scrolling can draw a form. */
+const CLIP = /* glsl */ `
+  uniform vec4 uClip;
+  varying vec3 vLocal;
+`;
+
 const PATH_VERT = /* glsl */ `
+  uniform float uTime;
+  ${DRIFT}
+  varying vec3 vLocal;
   attribute float aPhase;
   attribute float aAcross;
   attribute float aLength;
@@ -45,6 +63,8 @@ const PATH_VERT = /* glsl */ `
     vPhase = aPhase;
     vLen = aLength;
     vec4 world = instanceMatrix * vec4(position, 1.0);
+    vLocal = world.xyz;
+    world.xyz = drifted(world.xyz, uTime);
     vHeight = world.y;
     vec4 mv = modelViewMatrix * world;
     vDepth = -mv.z;
@@ -58,6 +78,9 @@ const PATH_FRAG = /* glsl */ `
   uniform vec3 uColorB;
   uniform vec2 uFog;
   uniform float uOpacity;
+  uniform float uSignal;
+  uniform float uFront;
+  ${CLIP}
   varying float vLevel;
   varying float vAcross;
   varying float vAlong;
@@ -66,14 +89,17 @@ const PATH_FRAG = /* glsl */ `
   varying float vDepth;
   varying float vHeight;
   void main() {
+    if (dot(vLocal, uClip.xyz) > uClip.w) discard;
     float across = 1.0 - abs(vAcross);
     float core = pow(across, 7.0);
     float glow = pow(across, 2.2) * 0.14;
     float t = fract(uTime * 0.11 - vPhase - vAlong * vLen * 0.09);
-    float pulse = smoothstep(0.86, 0.995, t) * (1.0 - smoothstep(0.995, 1.0, t));
+    float pulse = vPhase >= 9.0 ? 0.0 : smoothstep(0.86, 0.995, t) * (1.0 - smoothstep(0.995, 1.0, t));
+    // The first light through the finished machine: one front, travelling out from the core.
+    float front = uFront < 0.0 ? 0.0 : exp(-pow((length(vLocal) - uFront) * 1.5, 2.0)) * 3.0;
     float fog = 1.0 - smoothstep(uFog.x, uFog.y, vDepth);
     vec3 color = mix(uColorA, uColorB, smoothstep(-3.5, 3.5, vHeight));
-    float intensity = (core + glow) * (0.1 + pulse * 1.7) * vLevel;
+    float intensity = (core + glow) * (0.14 + pulse * 1.7 * uSignal + front) * vLevel;
     vec3 light = color * intensity * fog * uOpacity;
     gl_FragColor = vec4(light, max(light.r, max(light.g, light.b)));
     #include <colorspace_fragment>
@@ -85,12 +111,16 @@ const NODE_VERT = /* glsl */ `
   attribute float aPhaseNode;
   attribute float aLevel;
   uniform float uTime;
+  ${DRIFT}
+  varying vec3 vLocal;
   varying vec2 vUv2;
   varying vec3 vColor;
   varying float vDepth;
   varying float vLight;
   void main() {
     vec4 center = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+    vLocal = center.xyz;
+    center.xyz = drifted(center.xyz, uTime);
     float radius = length(instanceMatrix[0].xyz);
     vec4 mv = modelViewMatrix * center;
     // Halo extends well beyond the visual core, so the quad is larger than the radius.
@@ -108,11 +138,13 @@ const NODE_VERT = /* glsl */ `
 const NODE_FRAG = /* glsl */ `
   uniform vec2 uFog;
   uniform float uOpacity;
+  ${CLIP}
   varying vec2 vUv2;
   varying vec3 vColor;
   varying float vDepth;
   varying float vLight;
   void main() {
+    if (dot(vLocal, uClip.xyz) > uClip.w) discard;
     float d = length(vUv2) * 4.2;
     if (d > 4.2) discard;
     float core = 1.0 - smoothstep(0.82, 0.96, d);
@@ -127,6 +159,9 @@ const NODE_FRAG = /* glsl */ `
 
 const PANEL_VERT = /* glsl */ `
   attribute float aGlow;
+  uniform float uTime;
+  ${DRIFT}
+  varying vec3 vLocal;
   varying vec3 vNormal2;
   varying vec3 vView;
   varying vec2 vUv2;
@@ -135,7 +170,10 @@ const PANEL_VERT = /* glsl */ `
   void main() {
     vUv2 = uv;
     vGlow = aGlow;
-    vec4 mv = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+    vec4 local = instanceMatrix * vec4(position, 1.0);
+    vLocal = local.xyz;
+    local.xyz = drifted(local.xyz, uTime);
+    vec4 mv = modelViewMatrix * local;
     vNormal2 = normalize(normalMatrix * mat3(instanceMatrix) * normal);
     vView = normalize(-mv.xyz);
     vDepth = -mv.z;
@@ -149,14 +187,16 @@ const PANEL_FRAG = /* glsl */ `
   uniform vec2 uFog;
   uniform float uOpacity;
   uniform float uTime;
+  ${CLIP}
   varying vec3 vNormal2;
   varying vec3 vView;
   varying vec2 vUv2;
   varying float vGlow;
   varying float vDepth;
   void main() {
+    if (dot(vLocal, uClip.xyz) > uClip.w) discard;
     float f = pow(1.0 - abs(dot(normalize(vNormal2), normalize(vView))), 2.2);
-        float edge = max(abs(vUv2.x - 0.5), abs(vUv2.y - 0.5)) * 2.0;
+    float edge = max(abs(vUv2.x - 0.5), abs(vUv2.y - 0.5)) * 2.0;
     float rim = smoothstep(0.96, 1.0, edge) * 0.05;
     float fog = 1.0 - smoothstep(uFog.x, uFog.y, vDepth);
     vec3 glass = uTint * (0.014 + f * 0.09 + rim);
@@ -168,6 +208,9 @@ const PANEL_FRAG = /* glsl */ `
 `;
 
 const STEEL_VERT = /* glsl */ `
+  uniform float uTime;
+  ${DRIFT}
+  varying vec3 vLocal;
   varying vec3 vNormalW;
   varying vec3 vWorld;
   varying vec2 vBox;
@@ -178,6 +221,8 @@ const STEEL_VERT = /* glsl */ `
     vBox = uv;
     vLevel = instanceColor.r;
     vec4 local = instanceMatrix * vec4(position, 1.0);
+    vLocal = local.xyz;
+    local.xyz = drifted(local.xyz, uTime);
     vHeight = local.y;
     vec4 world = modelMatrix * local;
     vWorld = world.xyz;
@@ -190,7 +235,7 @@ const STEEL_VERT = /* glsl */ `
 `;
 
 /**
- * Brushed metal lit by an analytic studio: long strip lights reflected along each member, plus a key and a rim.
+ * Brushed titanium lit by an analytic studio: long strip lights reflected along each module, plus a key and a rim.
  * The same look as a prefiltered environment map, without its start-up cost or a heavyweight PBR shader.
  */
 const STEEL_FRAG = /* glsl */ `
@@ -203,6 +248,7 @@ const STEEL_FRAG = /* glsl */ `
   uniform vec3 uRim;
   uniform float uEnv;
   uniform vec2 uFog;
+  ${CLIP}
   varying vec3 vNormalW;
   varying vec3 vWorld;
   varying vec2 vBox;
@@ -217,26 +263,35 @@ const STEEL_FRAG = /* glsl */ `
   vec3 studio(vec3 r) {
     vec3 c = vec3(0.006, 0.007, 0.012);
     c += vec3(0.91, 0.93, 1.0) * 3.4 * band(r.y, 0.86, 0.1);
-    c += vec3(0.55, 0.36, 0.96) * 2.6 * band(r.x, -0.84, 0.12);
-    c += vec3(0.22, 0.74, 0.97) * 2.2 * band(r.x, 0.82, 0.1);
+    c += vec3(0.55, 0.36, 0.96) * 1.45 * band(r.x, -0.84, 0.12);
+    c += vec3(0.22, 0.74, 0.97) * 1.2 * band(r.x, 0.82, 0.1);
     c += vec3(1.0) * 1.0 * band(r.y, -0.76, 0.06);
     c += vec3(0.87, 0.89, 1.0) * 1.8 * band(r.z, -0.9, 0.05);
     return c;
   }
 
   void main() {
+    float clipped = dot(vLocal, uClip.xyz) - uClip.w;
+    if (clipped > 0.0) discard;
     vec3 n = normalize(vNormalW);
     vec3 v = normalize(cameraPosition - vWorld);
-    // A box face has one normal, so the reflection is bent along the member to make highlights travel down it.
+    // A box face has one normal, so the reflection is bent across the surface to make highlights travel over it.
     vec3 r = normalize(reflect(-v, n) + 0.2 * sin(vWorld.yzx * 1.7));
-    float fresnel = 0.4 + 0.6 * pow(1.0 - max(dot(n, v), 0.0), 4.0);
-    vec3 color = uTint * studio(r) * uEnv * fresnel;
-    color += uTint * uKey * (0.02 * max(dot(n, normalize(vec3(4.0, 7.0, 6.0))), 0.0) + 1.1 * pow(max(dot(r, normalize(vec3(4.0, 7.0, 6.0))), 0.0), 26.0));
+    float fresnel = 0.28 + 0.72 * pow(1.0 - max(dot(n, v), 0.0), 4.0);
+    // Fine brushing, running one way across each face.
+    float brush = 0.9 + 0.1 * sin(dot(vLocal, vec3(3.0, 83.0, 11.0)));
+    vec3 color = uTint * studio(r) * uEnv * fresnel * brush;
+    vec3 keyDir = normalize(vec3(4.0, 7.0, 6.0));
+    color += uTint * uKey * ((0.035 + 0.17 * max(dot(n, keyDir), 0.0)) * brush + 1.1 * pow(max(dot(r, keyDir), 0.0), 26.0));
     color += uTint * uRim * 1.3 * pow(max(dot(r, normalize(vec3(-6.0, 1.5, -5.0))), 0.0), 14.0);
 
-    float edge = smoothstep(0.55, 1.0, max(abs(vBox.x - 0.5), abs(vBox.y - 0.5)) * 2.0);
+    // A hairline along every machined edge, the same width on screen however large the block.
+    vec2 toEdge = min(vBox, 1.0 - vBox) / max(fwidth(vBox), vec2(1e-5));
+    float edge = 1.0 - smoothstep(0.3, 1.7, min(toEdge.x, toEdge.y));
     float scan = 0.28 + 0.72 * pow(0.5 + 0.5 * sin(vHeight * 0.85 - uTime * 0.28), 3.0);
-    color += mix(uEdgeA, uEdgeB, smoothstep(-4.0, 4.0, vHeight)) * edge * scan * uEdge * 0.26;
+    color += mix(uEdgeA, uEdgeB, smoothstep(-4.0, 4.0, vHeight)) * edge * scan * uEdge * 0.46;
+    // Whatever is being drawn glows at the line where it is being drawn.
+    color += mix(uEdgeA, uEdgeB, 0.5) * smoothstep(-0.14, 0.0, clipped) * 1.6;
 
     color *= vLevel;
     color = color / (1.0 + color * 0.3);
@@ -276,6 +331,8 @@ function additive(params: THREE.ShaderMaterialParameters) {
   });
 }
 
+const NO_CLIP = [0, 1, 0, 99] as const;
+
 const WASHES = ["steel", "crimson", "blue", "dusk", "gold"] as const;
 type WashId = (typeof WASHES)[number];
 
@@ -303,6 +360,11 @@ export class SculptureEngine {
   private pathSeeds = new Float32Array(COUNT.paths);
   private panelSeeds = new Float32Array(COUNT.panels);
   private nodeSeeds = new Float32Array(COUNT.nodes);
+  /** How far each part is from the core: what's nearest arrives first. */
+  private beamDock = new Float32Array(COUNT.beams);
+  private pathDock = new Float32Array(COUNT.paths);
+  private panelDock = new Float32Array(COUNT.panels);
+  private nodeDock = new Float32Array(COUNT.nodes);
   private colorScratch = new THREE.Color();
   private colorScratch2 = new THREE.Color();
   private cameraPos = new THREE.Vector3();
@@ -310,9 +372,13 @@ export class SculptureEngine {
   private labelVec = new THREE.Vector3();
   private pointerX = 0;
   private pointerY = 0;
-  private focusBeamTags = new Set<number>();
-  private focusNodes = new Set<number>();
-  private lastFocus: string | null = null;
+  private focus = new THREE.Vector3();
+  private focusTarget = new THREE.Vector3();
+  private clip = { value: new THREE.Vector4(0, 1, 0, 99) };
+  private drift = { value: 0 };
+  /** How far the first light has travelled, or below zero once it has left. */
+  private front = { value: -1 };
+  private frontClock = 0;
   /** What the current step of a sequence lights up. */
   private litTags = new Set<number>();
   private litForm: FormId | null = null;
@@ -322,7 +388,7 @@ export class SculptureEngine {
   private time = 0;
   private viewOffset = { w: 0, h: 0, x: 0, y: 0 };
   private washEls: Partial<Record<WashId, HTMLElement>> = {};
-  private lastState = { a: "", b: "", mix: -1, assemble: -1, hover: null as readonly number[] | null, focus: null as string | null, lit: "" };
+  private lastState = { a: "", b: "", mix: -1, assemble: -1, hover: null as readonly number[] | null, lit: "" };
   private settling = 0;
   private canvasEl: HTMLElement | null = null;
 
@@ -357,7 +423,7 @@ export class SculptureEngine {
       }),
     ) as Record<PoseId, ResolvedPose>;
 
-    // Beams: reflective steel, with a light line tracing each edge.
+    // Blocks: reflective titanium, with a light line tracing each edge.
     this.beamMaterial = new THREE.ShaderMaterial({
       vertexShader: STEEL_VERT,
       fragmentShader: STEEL_FRAG,
@@ -372,6 +438,8 @@ export class SculptureEngine {
         uRim: { value: new THREE.Color() },
         uEnv: { value: 1 },
         uFog: { value: new THREE.Vector2(9, 30) },
+        uClip: this.clip,
+        uDrift: this.drift,
       },
     });
     this.beamMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), this.beamMaterial, COUNT.beams);
@@ -394,6 +462,10 @@ export class SculptureEngine {
         uColorB: { value: new THREE.Color() },
         uFog: { value: new THREE.Vector2(9, 30) },
         uOpacity: { value: 1 },
+        uSignal: { value: 1 },
+        uFront: this.front,
+        uClip: this.clip,
+        uDrift: this.drift,
       },
     });
     this.pathMesh = new THREE.InstancedMesh(pathGeometry, this.pathMaterial, COUNT.paths);
@@ -413,6 +485,8 @@ export class SculptureEngine {
         uFog: { value: new THREE.Vector2(9, 30) },
         uOpacity: { value: 1 },
         uTime: { value: 0 },
+        uClip: this.clip,
+        uDrift: this.drift,
       },
     });
     this.panelMesh = new THREE.InstancedMesh(panelGeometry, this.panelMaterial, COUNT.panels);
@@ -430,20 +504,39 @@ export class SculptureEngine {
     this.nodeMaterial = additive({
       vertexShader: NODE_VERT,
       fragmentShader: NODE_FRAG,
-      uniforms: { uTime: { value: 0 }, uFog: { value: new THREE.Vector2(9, 30) }, uOpacity: { value: 1 } },
+      uniforms: { uTime: { value: 0 }, uFog: { value: new THREE.Vector2(9, 30) }, uOpacity: { value: 1 }, uClip: this.clip, uDrift: this.drift },
     });
     this.nodeMesh = new THREE.InstancedMesh(nodeGeometry, this.nodeMaterial, COUNT.nodes);
     this.nodeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.nodeMesh.frustumCulled = false;
     this.nodeMesh.renderOrder = 4;
 
-    // Stagger seeds: mostly height-ordered (members arrive floor by floor), with a little noise.
+    // Stagger seeds: mostly height-ordered, with a little noise.
     for (let i = 0; i < COUNT.beams; i++) {
       this.beamSeeds[i] = clamp01((i / COUNT.beams) * 0.82 + ((i * 7.13) % 1) * 0.18);
     }
     for (let i = 0; i < COUNT.paths; i++) this.pathSeeds[i] = (i * 0.381) % 1;
     for (let i = 0; i < COUNT.panels; i++) this.panelSeeds[i] = (i * 0.618) % 1;
     for (let i = 0; i < COUNT.nodes; i++) this.nodeSeeds[i] = (i * 0.272) % 1;
+
+    const dock = (x: number, y: number, z: number) => clamp01(Math.hypot(x, y, z) / 4.2);
+    const { core } = forms;
+    for (let i = 0; i < COUNT.beams; i++) {
+      const o = i * STRIDE.beams;
+      this.beamDock[i] = dock((core.beams[o] + core.beams[o + 3]) / 2, (core.beams[o + 1] + core.beams[o + 4]) / 2, (core.beams[o + 2] + core.beams[o + 5]) / 2);
+    }
+    for (let i = 0; i < COUNT.paths; i++) {
+      const o = i * STRIDE.paths;
+      this.pathDock[i] = dock(core.paths[o], core.paths[o + 1], core.paths[o + 2]);
+    }
+    for (let i = 0; i < COUNT.panels; i++) {
+      const o = i * STRIDE.panels;
+      this.panelDock[i] = dock(core.panels[o], core.panels[o + 1], core.panels[o + 2]);
+    }
+    for (let i = 0; i < COUNT.nodes; i++) {
+      const o = i * STRIDE.nodes;
+      this.nodeDock[i] = dock(core.nodes[o], core.nodes[o + 1], core.nodes[o + 2]);
+    }
 
     this.group.add(this.beamMesh, this.panelMesh, this.pathMesh, this.nodeMesh);
     threeScene.add(this.group);
@@ -459,19 +552,18 @@ export class SculptureEngine {
     this.canvasEl = el;
   }
 
-  /** Per-instance transition progress: floors move in sequence rather than all at once. */
+  /** Per-instance transition progress: modules move in sequence rather than all at once. */
   private staggered(mix: number, seed: number, spread: number) {
     if (mix <= 0) return 0;
     if (mix >= 1) return 1;
     return smoothstep(clamp01((mix * (1 + spread) - seed * spread) / 1));
   }
 
-  private writeBeams(a: Form, b: Form, mix: number, assemble: number, drift: number) {
+  private writeBeams(a: Form, b: Form, mix: number, assemble: number) {
     const m = this.beamMesh.instanceMatrix.array as Float32Array;
     const scatter = this.forms.scatter.beams;
     const A = a.beams;
     const B = b.beams;
-    const t = this.time;
     const assembling = assemble < 1;
 
     for (let i = 0; i < COUNT.beams; i++) {
@@ -484,27 +576,22 @@ export class SculptureEngine {
       let bx = lerp(A[o + 3], B[o + 3], k);
       let by = lerp(A[o + 4], B[o + 4], k);
       let bz = lerp(A[o + 5], B[o + 5], k);
-      // Members thin to drawn lines while travelling, so a morph reads as a sketch, never as rubble.
-      let th = lerp(A[o + 6], B[o + 6], k) * (1 - 0.68 * bump(k));
+      // Parts thin to drawn lines while travelling, so a morph reads as a sketch, never as rubble.
+      const thin = 1 - 0.68 * bump(k);
+      let th = lerp(A[o + 6], B[o + 6], k) * thin;
+      let hh = lerp(A[o + 7], B[o + 7], k) * thin;
 
       if (assembling) {
-        const q = this.staggered(assemble, seed, 1.1);
+        const q = this.staggered(clamp01(assemble / 0.72), this.beamDock[i], 1.4);
         ax = lerp(scatter[o], ax, q);
         ay = lerp(scatter[o + 1], ay, q);
         az = lerp(scatter[o + 2], az, q);
         bx = lerp(scatter[o + 3], bx, q);
         by = lerp(scatter[o + 4], by, q);
         bz = lerp(scatter[o + 5], bz, q);
-        th = lerp(scatter[o + 6], th, q);
-      }
-
-      if (drift > 0) {
-        const wa = Math.sin(t * 0.42 + ay * 0.9) * drift;
-        const wb = Math.sin(t * 0.42 + by * 0.9) * drift;
-        ax += wa;
-        bx += wb;
-        az += wa * 0.6;
-        bz += wb * 0.6;
+        const fade = smoothstep(clamp01(q * 1.6));
+        th = lerp(0, th, fade);
+        hh = lerp(0, hh, fade);
       }
 
       let dx = bx - ax;
@@ -512,7 +599,7 @@ export class SculptureEngine {
       let dz = bz - az;
       const len = Math.hypot(dx, dy, dz);
       const j = i * 16;
-      if (len < 1e-4 || th < 1e-4) {
+      if (len < 1e-4 || th < 1e-4 || hh < 1e-4) {
         m.fill(0, j, j + 16);
         m[j + 15] = 1;
         continue;
@@ -538,9 +625,9 @@ export class SculptureEngine {
       m[j + 1] = xy * th;
       m[j + 2] = xz * th;
       m[j + 3] = 0;
-      m[j + 4] = yx * th;
-      m[j + 5] = yy * th;
-      m[j + 6] = yz * th;
+      m[j + 4] = yx * hh;
+      m[j + 5] = yy * hh;
+      m[j + 6] = yz * hh;
       m[j + 7] = 0;
       m[j + 8] = dx * len;
       m[j + 9] = dy * len;
@@ -565,8 +652,9 @@ export class SculptureEngine {
     const A = a.paths;
     const B = b.paths;
     // Light switches off mid-morph and comes back when the new form has settled.
-    const presence = Math.pow(Math.abs(mix * 2 - 1), 2) * smoothstep(clamp01((assemble - 0.72) / 0.28));
+    const presence = Math.pow(Math.abs(mix * 2 - 1), 2) * (assemble > 0.42 ? 1 : 0);
     const width = 0.05 * presence;
+    const highlight = current.pose.highlight;
 
     for (let i = 0; i < COUNT.paths; i++) {
       const o = i * STRIDE.paths;
@@ -574,9 +662,11 @@ export class SculptureEngine {
       const ax = lerp(A[o], B[o], k);
       const ay = lerp(A[o + 1], B[o + 1], k);
       const az = lerp(A[o + 2], B[o + 2], k);
-      const bx = lerp(A[o + 3], B[o + 3], k);
-      const by = lerp(A[o + 4], B[o + 4], k);
-      const bz = lerp(A[o + 5], B[o + 5], k);
+      // During the entrance each connection draws itself outward, once the modules it joins are there.
+      const grow = assemble < 1 ? smoothstep(clamp01((assemble - 0.42 - this.pathDock[i] * 0.36) / 0.14)) : 1;
+      const bx = lerp(ax, lerp(A[o + 3], B[o + 3], k), grow);
+      const by = lerp(ay, lerp(A[o + 4], B[o + 4], k), grow);
+      const bz = lerp(az, lerp(A[o + 5], B[o + 5], k), grow);
       let dx = bx - ax;
       let dy = by - ay;
       let dz = bz - az;
@@ -584,7 +674,9 @@ export class SculptureEngine {
       const j = i * 16;
       phases.array[i] = mix < 0.5 ? A[o + 6] : B[o + 6];
       lengths.array[i] = len;
-      this.pathLevel[i] = damp(this.pathLevel[i], this.sequenceLevel(current, current.form.pathTags[i], 4, 0.18, 1), 7, dt);
+      const tag = current.form.pathTags[i];
+      const dimmed = highlight && this.litForm !== current.pose.form && tag >= 0 && !highlight.includes(tag);
+      this.pathLevel[i] = damp(this.pathLevel[i], dimmed ? 0.12 : this.sequenceLevel(current, tag, 4, 0.18, 1), 7, dt);
       levels.array[i] = this.pathLevel[i];
       if (len < 1e-4 || width < 1e-4) {
         m.fill(0, j, j + 16);
@@ -635,9 +727,9 @@ export class SculptureEngine {
     const glowAttr = this.panelMesh.geometry.getAttribute("aGlow") as THREE.InstancedBufferAttribute;
     const A = a.panels;
     const B = b.panels;
-    const arrive = smoothstep(clamp01((assemble - 0.55) / 0.45));
 
     for (let i = 0; i < COUNT.panels; i++) {
+      const arrive = smoothstep(clamp01((assemble - 0.2 - this.panelDock[i] * 0.42) / 0.26));
       const o = i * STRIDE.panels;
       const k = this.staggered(mix, this.panelSeeds[i], 0.4);
       const cx = lerp(A[o], B[o], k);
@@ -685,9 +777,7 @@ export class SculptureEngine {
     const B = pb.form.nodes;
     const GA = pa.form.nodeGroups;
     const GB = pb.form.nodeGroups;
-    const arrive = smoothstep(clamp01((assemble - 0.6) / 0.4));
     const hover = store.hoverGroups;
-    const hasFocus = store.focusSkill !== null;
     const white = this.colorScratch2.set("#ffffff");
     const current = mix < 0.5 ? pa : pb;
     const groupsLit = current.pose.form === "bloodlink" ? hover : null;
@@ -695,6 +785,7 @@ export class SculptureEngine {
     for (let i = 0; i < COUNT.nodes; i++) {
       const o = i * STRIDE.nodes;
       const k = this.staggered(mix, this.nodeSeeds[i], 0.5);
+      const arrive = smoothstep(clamp01((assemble - 0.02 - this.nodeDock[i] * 0.55) / 0.24));
       const r = lerp(A[o + 3], B[o + 3], k) * arrive;
       const j = i * 16;
       m[j] = r;
@@ -714,9 +805,8 @@ export class SculptureEngine {
 
       const group = mix < 0.5 ? GA[i] : GB[i];
       let target = this.sequenceLevel(current, current.form.nodeTags[i], 2.4, 0.3, 1);
-      if (current.pose.highlight && !current.pose.highlight.includes(group)) target = 0.12;
+      if (current.pose.highlight && this.litForm !== current.pose.form && !current.pose.highlight.includes(group)) target = 0.12;
       if (groupsLit) target = groupsLit.includes(group) ? 1.9 : 0.22;
-      if (hasFocus) target = this.focusNodes.has(i) ? 2 : 0.16;
       this.nodeLevel[i] = damp(this.nodeLevel[i], target, 9, dt);
       levelAttr.array[i] = this.nodeLevel[i];
     }
@@ -733,23 +823,18 @@ export class SculptureEngine {
     const sequence = p.pose.sequence;
     if (!sequence || this.litForm !== p.pose.form) return normal;
     if (tag < 0) return sequence.rest;
-    return this.litTags.has(tag) ? lit : unlit;
+    return this.litTags.has(tag) ? (sequence.lit ?? 1) * lit : (sequence.unlit ?? 1) * unlit;
   }
 
   private beamLevel(p: ResolvedPose, i: number): number {
     if (p.form.beamGroups[i] === 255) return 1;
     const group = p.form.beamGroups[i];
-    if (store.focusSkill && p.pose.form === "constellation") {
-      const tag = p.form.beamTags[i];
-      if (tag < 0) return 0.22;
-      return this.focusBeamTags.has(tag) ? 3.2 : 0.14;
-    }
-    if (p.pose.form === "constellation") return group === 5 ? 0.5 : 0.85;
     if (store.hoverGroups && p.pose.form === "bloodlink") {
       return store.hoverGroups.includes(group) ? 1.8 : 0.28;
     }
-    if (p.pose.highlight) return p.pose.highlight.includes(group) || group === 4 ? (group === 4 ? 0.5 : 1.4) : 0.16;
-    return this.sequenceLevel(p, p.form.beamTags[i], 2.8, 0.22, 1);
+    if (this.litForm === p.pose.form) return this.sequenceLevel(p, p.form.beamTags[i], 2.8, 0.22, 1);
+    if (p.pose.highlight) return p.pose.highlight.includes(group) ? 1.4 : 0.16;
+    return 1;
   }
 
   private writeBrightness(pa: ResolvedPose, pb: ResolvedPose, mix: number, dt: number) {
@@ -766,22 +851,6 @@ export class SculptureEngine {
     col.needsUpdate = true;
   }
 
-  private refreshFocus() {
-    if (store.focusSkill === this.lastFocus) return;
-    this.lastFocus = store.focusSkill;
-    this.focusBeamTags.clear();
-    this.focusNodes.clear();
-    if (!store.focusSkill) return;
-    const skill = skillLayout.find((s) => s.id === store.focusSkill);
-    if (!skill) return;
-    skill.edges.forEach((e) => this.focusBeamTags.add(e));
-    this.focusNodes.add(skill.nodeIndex);
-    skill.linked.forEach((id) => {
-      const n = skillLayout.find((s) => s.id === id);
-      if (n) this.focusNodes.add(n.nodeIndex);
-    });
-  }
-
   /** Moves the current form's sequence on, and tells the 3D and the page about the step it has reached. */
   private updateSequence(dt: number, current: ResolvedPose, reduced: boolean, settled: boolean) {
     const { form, sequence } = current.pose;
@@ -791,8 +860,13 @@ export class SculptureEngine {
     }
     const pin = store.pin?.form === form ? store.pin.step : null;
     // It waits for the form to arrive, so nobody walks in halfway through the story.
-    if (sequence && pin === null && !reduced && !store.sequencePaused && settled) this.sequenceClock += dt;
-    const step = pin ?? (sequence && !reduced ? Math.floor(this.sequenceClock / sequence.period) % sequence.steps : null);
+    const running = sequence && !sequence.manual && !reduced;
+    if (running && pin === null && !store.sequencePaused && settled) this.sequenceClock += dt;
+    const step = pin ?? (running ? Math.floor(this.sequenceClock / sequence.period) % sequence.steps : null);
+
+    const focus = pin === null ? null : focusPointFor(form, pin);
+    if (focus) this.focusTarget.set(focus[0], focus[1], focus[2]);
+    else this.focusTarget.set(0, 0, 0);
 
     const key = step === null ? "" : `${form}:${step}`;
     if (key === this.litKey) return;
@@ -852,10 +926,19 @@ export class SculptureEngine {
     const portrait = width / height < 0.9;
     const assemble = reduced ? 1 : store.assemble;
 
-    this.refreshFocus();
     this.updateSequence(dt, mix < 0.5 ? pa : pb, reduced, (mix === 0 || mix === 1) && assemble >= 1);
 
-    const drift = reduced || this.compact ? 0 : lerp(A.drift, B.drift, mix);
+    this.drift.value = reduced || this.compact ? 0 : lerp(A.drift, B.drift, mix);
+    const clipA = A.clip ?? NO_CLIP;
+    const clipB = B.clip ?? NO_CLIP;
+    this.clip.value.set(lerp(clipA[0], clipB[0], mix), lerp(clipA[1], clipB[1], mix), lerp(clipA[2], clipB[2], mix), lerp(clipA[3], clipB[3], mix));
+    // Once the machine has assembled, one front of light runs out through it.
+    if (reduced || this.frontClock > 2.8) {
+      this.front.value = -1;
+    } else if (assemble > 0.86) {
+      this.frontClock += dt;
+      this.front.value = this.frontClock * 2.6;
+    }
 
     const last = this.lastState;
     // Moving the steel is the expensive write. A change of light alone leaves it where it is.
@@ -863,7 +946,6 @@ export class SculptureEngine {
     const changed =
       moved ||
       last.hover !== store.hoverGroups ||
-      last.focus !== store.focusSkill ||
       last.lit !== this.litKey;
     if (changed) {
       last.a = store.poseA;
@@ -871,15 +953,14 @@ export class SculptureEngine {
       last.mix = mix;
       last.assemble = assemble;
       last.hover = store.hoverGroups;
-      last.focus = store.focusSkill;
       last.lit = this.litKey;
       // Long enough for damped brightness to finish arriving after the last change.
       this.settling = 1.6;
     } else {
       this.settling -= dt;
     }
-    if (drift > 0 || moved) this.writeBeams(pa.form, pb.form, mix, assemble, drift);
-    if (drift > 0 || this.settling > 0) {
+    if (moved) this.writeBeams(pa.form, pb.form, mix, assemble);
+    if (this.settling > 0) {
       this.writePaths(pa, pb, mix, assemble, reduced ? 1 : dt);
       this.writePanels(pa, pb, mix, assemble, reduced ? 1 : dt);
       this.writeNodes(pa, pb, mix, assemble, reduced ? 1 : dt);
@@ -890,15 +971,14 @@ export class SculptureEngine {
     const fine = !portrait && !reduced;
     this.pointerX = damp(this.pointerX, fine ? store.pointerX : 0, 2.6, dt);
     this.pointerY = damp(this.pointerY, fine ? store.pointerY : 0, 2.6, dt);
-
-    if (!store.dragging && B.form !== "constellation") store.dragYaw = damp(store.dragYaw, 0, 3, dt);
+    this.focus.lerp(this.focusTarget, 1 - Math.exp(-3 * dt));
 
     const sway = reduced ? 0 : Math.sin(t * 0.09) * 0.05;
-    // The entrance: the structure turns into place while the camera settles back to its mark.
+    // The entrance: the machine turns into place while the camera settles back to its mark.
     const arrival = 1 - smoothstep(assemble);
     this.group.rotation.set(
       lerp(A.pitch, B.pitch, mix) + this.pointerY * 0.05,
-      lerp(A.yaw, B.yaw, mix) + sway + this.pointerX * 0.14 + store.dragYaw - arrival * 0.55,
+      lerp(A.yaw, B.yaw, mix) + sway + this.pointerX * 0.14 - arrival * 0.3,
       0,
     );
 
@@ -917,15 +997,10 @@ export class SculptureEngine {
     cam.sub(look).multiplyScalar(zoom * (1 - arrival * 0.14)).add(look);
     cam.x += this.pointerX * 0.28;
     cam.y += this.pointerY * 0.18;
+    // A held part draws the camera towards it, keeping everything else in frame.
+    look.x += this.focus.x * 0.07;
+    look.y += this.focus.y * 0.07;
 
-    // A hovered skill eases the camera towards its node, keeping the rest in frame.
-    if (store.focusSkill && B.form === "constellation") {
-      const skill = skillLayout.find((s) => s.id === store.focusSkill);
-      if (skill) {
-        look.x += skill.position[0] * 0.09;
-        look.y += skill.position[1] * 0.09;
-      }
-    }
     camera.position.copy(cam);
     camera.lookAt(look);
 
@@ -963,6 +1038,7 @@ export class SculptureEngine {
     lerpColor(path.uColorA.value, pa.pathA, pb.pathA);
     lerpColor(path.uColorB.value, pa.pathB, pb.pathB);
     path.uFog.value.set(near, far);
+    path.uSignal.value = lerp(A.signal ?? 1, B.signal ?? 1, mix);
 
     const panel = this.panelMaterial.uniforms;
     panel.uTime.value = t;

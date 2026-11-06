@@ -2,7 +2,7 @@ import { ArrowUp, ArrowUpRight, Download, Mail } from "lucide-react";
 
 import { GithubIcon, LinkedinIcon } from "@/components/ui/BrandIcons";
 import { Magnetic } from "@/components/ui/Magnetic";
-import { SheetLabel } from "@/components/ui/SheetLabel";
+import { SectionLabel } from "@/components/ui/SectionLabel";
 import { Split } from "@/components/ui/Split";
 import { TransitionLink } from "@/components/ui/TransitionLink";
 import { profile } from "@/data/profile";
@@ -19,7 +19,7 @@ export function Contact() {
       aria-labelledby="contact-title"
       className="z-content relative flex min-h-svh flex-col justify-end px-(--gutter) pt-36 pb-8 lg:pt-24"
     >
-      <SheetLabel sheet="07" title="The Threshold" className="mb-8" />
+      <SectionLabel index="08" title="Converging Network" className="mb-8" />
       <h2 id="contact-title" data-reveal="chars" className="display text-[clamp(2.65rem,min(9.4vw,13.5svh),10.5rem)]">
         <Split text={"Let's Build\nSomething\nExtraordinary."} />
       </h2>
@@ -28,6 +28,9 @@ export function Contact() {
         <div className="lg:col-span-5">
           <p data-reveal="rise" className="body-lead max-w-[28rem]">
             Have an interesting project, opportunity, or idea? Let&apos;s turn it into something meaningful.
+          </p>
+          <p data-reveal="rise" className="text-mute mt-3 max-w-[28rem] leading-relaxed">
+            Different technologies, experiences, and ideas come together to build something meaningful.
           </p>
           <div data-reveal="rise" className="mt-7 flex flex-wrap items-center gap-3">
             <Magnetic strength={0.5}>

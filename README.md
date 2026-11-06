@@ -1,23 +1,24 @@
-# The Digital Architect
+# The Computational Universe
 
-Portfolio of Nirupam Pal. One WebGL sculpture stays on screen for the whole page and physically rebuilds itself for each chapter of the story.
+An interactive journey through software, systems, data and intelligence: the portfolio of Nirupam Pal. One WebGL scene stays on screen for the whole page and rebuilds itself into a different system for each chapter.
 
 ## The idea
 
-The site is a drawing set for one building. Sections are numbered sheets, the scroll indicator is a dimension line, and a single pool of steel beams, light paths, glass panels and nodes changes form as you scroll:
+Every object is a system and every connection is information. A single pool of machined modules, light paths, translucent surfaces and nodes changes form as you scroll:
 
 | Section | Form |
 | --- | --- |
-| Hero | The stack as a tower, database to frontend. Each module is real work, wired to the technologies it uses |
-| About | Four plates showing what each paragraph says: the stack layers, the three creative teams, the route to BloodLink, what a manager does |
-| BloodLink | Acts out the request flow: search by location, send a request, donor accepts, chat opens |
-| ProLink | Acts out the features: publish a post, likes and comments, connect with a user |
-| Wanderlust | Three houses built from the three listing photos, each lighting with its picture |
-| Experience | A mast with one floor per job, lit as the timeline reaches it: the Leave and Attendance module, then the three teams |
-| Skills | A navigable constellation of five clusters |
-| Achievements | BloodLink's network held up twice: on an obelisk for the prize, on a screen for the presentation |
-| Education | Two levels, 2021 and 2026, with the base of the hero's tower standing on the degree |
-| Contact | An axis of arches past all five pieces of work, ending at an empty plot |
+| Hero | The Computational Core: one full-stack application as a machine, with its interface, services, database, API paths and a small AI/ML cluster |
+| About | The same application pulled apart into Frontend, APIs & Authentication, Backend and Database, with Problem Solving & System Design as a decision tree beside it |
+| BloodLink | A real-time network acting out the request flow: search by location, send a request, donor accepts, chat opens |
+| ProLink | A social graph acting out the features: publish a post, likes and comments, connect with a user |
+| Wanderlust | A map with the three real listings floating over their pins |
+| Experience | A branching commit graph that draws itself as the timeline is read. A way of picturing a career, not a real repository |
+| Skills | A graph of six clusters. Hovering a technology lights it, what it connects to and its category |
+| AI & ML | The Neural Intelligence Lab: input, hidden and output layers that assemble, connect and carry signals. Presented as areas of exploration |
+| Achievements | BloodLink's network twice: inside an award ring for the prize, broadcasting outward for the presentation |
+| Education | A knowledge graph from 2021 to 2026 |
+| Contact | Technologies, experiences and ideas converging on the core from the hero |
 
 ## Stack
 
@@ -83,9 +84,9 @@ To add a pose, add it to `POSES` in `scenes/poses.ts` and put `data-pose` on an 
 
 ### How the 3D carries real content
 
-`scenes/layouts.ts` says where the content sits in each form, with the text coming from `data/`. `data/stack.ts` maps each piece of work to the technologies it uses, so changing a project's stack rewires the tower.
+`scenes/layouts.ts` says where the content sits in each form, with the text coming from `data/`. `data/stack.ts` lists the layers of the application and their technologies, and `data/ai.ts` holds the AI & ML copy, network layers and roadmap.
 
-- **Tags** mark which beams, light paths, panels and nodes belong together. `litTagsFor` says what a step lights up.
+- **Tags** mark which modules, light paths, panels and nodes belong together. `litTagsFor` says what a step lights up.
 - **Sequences** (`sequence` on a pose) step through what a form acts out. Hovering, focusing or tapping a step holds it, and `PauseModels` stops them all. With reduced motion they never run on their own.
 - **`StepHost`** connects page content to a sequence: its `[data-step-item]` children get `data-active`.
 - **Labels** (`LABEL_SETS`, plus `HeroModel`) are DOM elements the render loop keeps over points in the model.
@@ -103,18 +104,18 @@ Content is hidden before hydration only when scripts are running, with a CSS fai
 
 - **One animation loop.** Lenis, the scroll director and the canvas all run from `gsap.ticker`, so DOM and 3D agree on every frame.
 - **Forms are built in a worker.** `scenes/loadForms.ts` runs `scenes/forms.worker.ts` off the main thread and receives the arrays by transfer.
-- **Steel is a small custom shader.** `STEEL_FRAG` in `scenes/engine.ts` reflects an analytic set of strip lights, so there is no environment map to prefilter and no PBR shader to compile at start-up.
+- **Titanium is a small custom shader.** `STEEL_FRAG` in `scenes/engine.ts` reflects an analytic set of strip lights, so there is no environment map to prefilter and no PBR shader to compile at start-up.
 - **Reveals use one IntersectionObserver** (`animations/reveal.ts`), and section tracking uses observers too. ScrollTrigger is kept for what is scrubbed or pinned.
 - **Hydration is split.** Each section in `app/page.tsx` has its own `Suspense` boundary, so React can yield between them.
 - **Motion loads on demand.** It is only used by `MobileMenu.tsx`, which is fetched the first time the menu opens.
-- **Phones do less.** The scene loads later, the forms hold still, and instance data is only rewritten while something is changing. A change of light alone does not rewrite the steel.
+- **Phones do less.** The scene loads later, the forms hold still, and instance data is only rewritten while something is changing. A change of light alone does not rewrite the modules.
 
 ## Accessibility and fallbacks
 
-- All content is real HTML and remains readable without WebGL. With no WebGL, or with Data Saver on, the canvas is skipped, the hero shows a static drawing and the skills become expandable lists.
+- All content is real HTML and remains readable without WebGL. With no WebGL, or with Data Saver on, the canvas is skipped, the hero and AI & ML sections show static drawings and the skills become expandable lists.
 - `prefers-reduced-motion`: no Lenis, pinning, reveals, cursor or ambient motion. The 3D holds still and only changes between sections.
 - The custom cursor appears only with a fine pointer that can hover.
-- Skill labels are real, focusable buttons positioned over the 3D nodes.
+- Skill labels are positioned over the 3D nodes, and the same list is available to screen readers as text.
 
 ## Updating content
 
@@ -122,4 +123,6 @@ Content is hidden before hydration only when scripts are running, with a CSS fai
 - Projects: `src/data/projects.ts`
 - Work history: `src/data/experience.ts`
 - Skills and how they connect: `src/data/skills.ts`
+- AI & ML copy and roadmap: `src/data/ai.ts`
+- Layers of the stack: `src/data/stack.ts`
 - Resume: replace `public/Nirupam-Pal-Resume.pdf`

@@ -1,4 +1,4 @@
-export type ClusterId = "languages" | "frontend" | "backend" | "databases" | "tools";
+export type ClusterId = "languages" | "frontend" | "backend" | "databases" | "tools" | "ai";
 
 export interface Skill {
   id: string;
@@ -6,12 +6,13 @@ export interface Skill {
   cluster: ClusterId;
 }
 
-export const clusters: readonly { id: ClusterId; label: string }[] = [
-  { id: "languages", label: "Languages" },
+export const clusters: readonly { id: ClusterId; label: string; emerging?: boolean }[] = [
+  { id: "languages", label: "Programming Languages" },
   { id: "frontend", label: "Frontend" },
   { id: "backend", label: "Backend" },
   { id: "databases", label: "Databases" },
-  { id: "tools", label: "Tools & Concepts" },
+  { id: "tools", label: "Development Tools" },
+  { id: "ai", label: "AI/ML Learning", emerging: true },
 ];
 
 export const skills: readonly Skill[] = [
@@ -33,6 +34,9 @@ export const skills: readonly Skill[] = [
   { id: "github", label: "GitHub", cluster: "tools" },
   { id: "rest", label: "RESTful APIs", cluster: "tools" },
   { id: "jwt", label: "JWT Authentication", cluster: "tools" },
+  { id: "ml", label: "Machine learning", cluster: "ai" },
+  { id: "neural", label: "Neural networks", cluster: "ai" },
+  { id: "data", label: "Data analysis", cluster: "ai" },
 ];
 
 /** How these technologies relate to one another. Structural facts, not proficiency claims. */
@@ -53,4 +57,7 @@ export const skillLinks: readonly (readonly [string, string])[] = [
   ["nest", "jwt"],
   ["git", "github"],
   ["rest", "next"],
+  ["python", "ml"],
+  ["python", "data"],
+  ["ml", "neural"],
 ];

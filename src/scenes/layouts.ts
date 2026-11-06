@@ -2,129 +2,93 @@
  * Where the portfolio's real content sits inside the 3D forms. Plain numbers and strings with no builder code,
  * so DOM labels can be projected onto the same points the forms draw, on the main thread and in the worker alike.
  */
+import { aiLayers } from "@/data/ai";
 import { achievements, education } from "@/data/profile";
 import { experience } from "@/data/experience";
 import { projects } from "@/data/projects";
 import { clusters, skillLinks, skills } from "@/data/skills";
-import { techList, tiers, work } from "@/data/stack";
+import { heroSystems, stackLayers } from "@/data/stack";
 
 import type { PoseId } from "./poses";
 
 export type V3 = readonly [number, number, number];
 
 /* ---------------------------------------- Tags: what lights up together */
-export const moduleTag = (m: number) => 100 + m;
-export const techTag = (t: number) => 200 + t;
-export const linkTag = (m: number, t: number) => 1000 + m * 100 + t;
 /** Labels that only belong to the first step of BloodLink's flow. */
 export const SEARCH_LABEL_TAG = 10;
-
-const techIndex = (label: string) => techList.findIndex((t) => t.label === label);
+/** A skill's own node is tagged with its index; these are the links between skills and the category names. */
+export const skillLinkTag = (i: number) => 100 + i;
+export const clusterTag = (i: number) => 500 + i;
+/** A neuron is tagged with its index; these are the connections between them. */
+export const synapseTag = (i: number) => 100 + i;
 
 /** The tags lit by a step of a form's sequence. */
 export function litTagsFor(form: string, step: number): number[] {
   switch (form) {
-    case "tower": {
-      const uses = work[step]?.uses ?? [];
-      return [moduleTag(step), ...uses.flatMap((u) => [techTag(techIndex(u)), linkTag(step, techIndex(u))])];
-    }
     case "bloodlink": {
       const tags = Array.from({ length: step + 1 }, (_, i) => i);
       return step === 0 ? [...tags, SEARCH_LABEL_TAG] : tags;
     }
     case "prolink":
       return Array.from({ length: step + 1 }, (_, i) => i);
-    case "wanderlust":
-      return [step];
+    case "neural":
+      return neuralLitTags(step);
+    case "constellation":
+      return skillLitTags(step);
     default:
-      return [];
+      return [step];
   }
 }
 
-/* ---------------------------------------- Hero tower */
-export const TOWER = { floors: 17, height: 9, column: 0.34, yaw: 0.42 } as const;
-export const floorY = (floor: number) => -TOWER.height / 2 + (floor / (TOWER.floors - 1)) * TOWER.height;
-export const outerRect = (f: number) => ({ w: 1.5 - 0.5 * f, d: 1.08 - 0.34 * f, twist: f * 1.1 });
+/** Where the camera leans while a step is held. */
+export function focusPointFor(form: string, step: number): V3 | null {
+  if (form === "constellation") return skillLayout[step]?.position ?? null;
+  if (form === "neural") return neurons[step]?.at ?? null;
+  return null;
+}
 
-const MODULE_PLACES: readonly { floor: number; angle: number; dist: number; size: V3; lift?: number }[] = [
-  { floor: 8, angle: 0.1, dist: 2.5, size: [0.95, 0.6, 0.7] },
-  { floor: 6, angle: 3.0, dist: 2.3, size: [0.8, 0.5, 0.55] },
-  { floor: 4, angle: 0.35, dist: 2.4, size: [0.8, 0.46, 0.6] },
-  { floor: 14, angle: 3.4, dist: 1.95, size: [0.62, 0.4, 0.5] },
-  { floor: 15, angle: 5.7, dist: 1.9, size: [0.7, 0.42, 0.52], lift: 0.62 },
-];
+/* ---------------------------------------- Hero: one application, seen as a system */
+export const CORE = {
+  frontend: [-2.6, 1.28, 0.75] as V3,
+  backend: [3.0, -0.1, -0.2] as V3,
+  database: [0.15, -2.55, 0.35] as V3,
+  gateway: [1.72, -0.02, -0.1] as V3,
+  ai: [2.25, 2.3, -0.8] as V3,
+} as const;
 
-export const towerModules = work.map((item, m) => {
-  const { floor, angle, dist, size, lift = 0.16 } = MODULE_PLACES[m];
-  const y = floorY(floor);
-  return {
-    id: item.id,
-    label: item.label,
-    tag: moduleTag(m),
-    floor,
-    angle,
-    size,
-    at: [Math.cos(angle) * dist, y, Math.sin(angle) * dist] as V3,
-    labelAt: [Math.cos(angle) * dist, y + size[1] / 2 + lift, Math.sin(angle) * dist] as V3,
-    uses: item.uses.map(techIndex),
-    team: (item.team ?? []).map((label, i) => {
-      const a = angle + (i - 1) * 0.5;
-      return { label, at: [Math.cos(a) * (dist + 0.75), y + (i - 1) * 0.42, Math.sin(a) * (dist + 0.75)] as V3 };
-    }),
-  };
-});
-
-/** The service core: one column of technologies, in stack order from the ground up. */
-export const towerTech = techList.map((t, i) => {
-  const low = floorY(t.tier * 4);
-  const band = floorY((t.tier + 1) * 4) - low;
-  return {
-    label: t.label,
-    tag: techTag(i),
-    at: [TOWER.column, low + ((t.slot + 0.5) / t.slots) * band, TOWER.column] as V3,
-  };
-});
-
-export const towerTiers = tiers.map((tier, k) => {
-  // Labelled on whichever corner of the twisting floor faces the viewer's right, so the tier name is never buried.
-  // The lowest tier sits a floor higher, clear of the page's scroll hint.
-  const floor = k === 0 ? 3 : k * 4 + 2;
-  const { w, d, twist } = outerRect(floor / (TOWER.floors - 1));
-  const c = Math.cos(twist);
-  const s = Math.sin(twist);
-  const corners = ([[-w, -d], [w, -d], [w, d], [-w, d]] as const).map(([x, z]) => [x * c - z * s, x * s + z * c] as const);
-  const score = ([x, z]: readonly [number, number]) => x * Math.cos(TOWER.yaw) + z * Math.sin(TOWER.yaw);
-  const [x, z] = corners.reduce((best, p) => (score(p) > score(best) ? p : best));
-  return { label: tier.label, at: [x, floorY(floor), z] as V3 };
-});
-
-/* ---------------------------------------- About: four plates */
-export const STRATA = { levels: [2.7, 0.9, -0.9, -2.7], R: 2.5 } as const;
-export const engineeringLanes: readonly { z: number; left: string; right: string }[] = [
-  { z: -1.5, left: "Next.js", right: "Angular" },
-  { z: 0, left: "NestJS", right: "Express" },
-  { z: 1.5, left: "MongoDB", right: "SQL" },
-];
-export const ENGINEERING_X = { left: -1.3, right: 0.75, rail: 1.95 } as const;
-export const creativityArcs: readonly { label: string; ring: number }[] = [
-  { label: "Video editors", ring: 2 },
-  { label: "Videographers", ring: 4 },
-  { label: "Graphic designers", ring: 6 },
-];
-export const creativityPoint = (ring: number): V3 => {
-  const a = Math.PI / 4;
-  const r = ring * 0.72;
-  return [-STRATA.R + Math.cos(a) * r, STRATA.levels[1], -STRATA.R + Math.sin(a) * r];
+/** Each name sits just outside its part, on the side with open space, so it never lands on the geometry. */
+const HERO_LABEL_AT: Record<string, { at: V3; end?: boolean }> = {
+  frontend: { at: [-3.72, 1.9, 0.75], end: true },
+  api: { at: [1.72, -0.86, -0.1] },
+  backend: { at: [3.3, -1.3, -0.2] },
+  database: { at: [1.45, -3.1, 0.35] },
+  ai: { at: [2.05, 3.2, -0.8] },
 };
-export const leadershipSpokes: readonly { label: string; angle: number }[] = [
-  { label: "Assign tasks", angle: 2.6 },
-  { label: "Schedule meetings", angle: 4.7 },
-  { label: "Client deliverables", angle: 0.5 },
+
+export const heroLabels = heroSystems.map((system, tag) => ({ ...system, tag, ...HERO_LABEL_AT[system.id] }));
+
+/* ---------------------------------------- About: the same system, pulled apart */
+export const ECOSYSTEM = {
+  spread: 1.95,
+  packed: 0.46,
+  problem: [-0.3, -2.42, 1.5] as V3,
+  labelY: 1.62,
+} as const;
+export const layerX = (i: number, spread: number) => (i - 1.5) * spread;
+/** Where each technology sits on its plate, in the plate's own y and z. */
+export const layerTech: readonly (readonly [number, number])[][] = [
+  [[0.6, -0.72], [0.6, 0.05], [0.6, 0.82]],
+  [[0.72, 0], [-0.36, -0.62], [-0.36, 0.62]],
+  [[0.8, -0.72], [-0.02, 0.5], [-0.82, -0.6]],
+  [[0.72, -0.78], [0.72, 0.78]],
 ];
-export const spokePoint = (angle: number): V3 => [Math.cos(angle) * 1.95, STRATA.levels[3], Math.sin(angle) * 1.95];
-export const TREE_START: V3 = [-2.3, STRATA.levels[2], -0.75];
-/** Where the one route through the decision tree ends up: four rights from the start. */
-export const TREE_END: V3 = [1.94, STRATA.levels[2], 1.37];
+const layerLabels = stackLayers.slice(0, 4).flatMap((layer, i) => [
+  { id: layer.id, text: layer.label, at: [layerX(i, ECOSYSTEM.spread), ECOSYSTEM.labelY + (i % 2) * 0.28, -1.1] as V3, tag: i },
+  ...layer.tech.map((tech, t) => {
+    const [y, z] = layerTech[i][t];
+    return { id: `${layer.id}-${tech}`, text: tech, at: [layerX(i, ECOSYSTEM.spread), y, z] as V3, tag: i, whenLit: true };
+  }),
+]);
 
 /* ---------------------------------------- BloodLink: the real request flow */
 export const BLOOD = {
@@ -176,46 +140,98 @@ export const avatarOf = (card: { c: V3; w: number; h: number }): V3 => [
   card.c[2],
 ];
 
-/* ---------------------------------------- Wanderlust: the listings in the screenshots */
-export const terrain = (x: number, z: number) => -1.25 + 0.28 * Math.sin(x * 0.5 + z * 0.22) + 0.18 * Math.cos(z * 0.4);
-export const lane = (z: number) => Math.sin(z * 0.28) * 1.15;
-export const listings: readonly { id: string; label: string; x: number; z: number; top: number }[] = [
-  { id: "lake", label: "Lakeside house", x: -2.2, z: -0.2, top: 1.05 },
-  { id: "cabin", label: "Timber cabin", x: -0.9, z: -2.6, top: 1.55 },
-  { id: "villa", label: "Villa and pool", x: 0.4, z: -5, top: 1.3 },
+/* ---------------------------------------- Wanderlust: the listings in the screenshots, on a map */
+export const MAP = { y: -1.45, x: 4.6, nearZ: 2.4, farZ: -6.4, search: [-0.6, 2.3, -3.2] as V3 } as const;
+export const listings: readonly { id: string; label: string; x: number; z: number; lift: number }[] = [
+  { id: "lake", label: "Lakeside house", x: -1.3, z: 0.7, lift: 2.0 },
+  { id: "cabin", label: "Timber cabin", x: 0.75, z: -1.4, lift: 2.75 },
+  { id: "villa", label: "Villa and pool", x: 2.75, z: 0.1, lift: 2.15 },
 ];
-export const listingAt = (l: (typeof listings)[number]): V3 => [l.x, terrain(l.x, l.z), l.z];
+export const pinAt = (l: (typeof listings)[number]): V3 => [l.x, MAP.y, l.z];
+export const cardAt = (l: (typeof listings)[number]): V3 => [l.x, MAP.y + l.lift, l.z];
+export const CARD = { w: 0.86, h: 0.62 } as const;
 
-/* ---------------------------------------- Experience: one floor per job */
-export const MAST = { prejestY: -1.6, thoughtflowY: 1.6, half: 0.45, bottom: -4.6, top: 4.6 } as const;
-export const leaveWing: V3 = [-1.55, MAST.prejestY, 0];
-export const attendanceWing: V3 = [1.55, MAST.prejestY, 0];
-export const TEAM_ANGLES = [0.5, 2.6, 4.7] as const;
-export const teamPoint = (a: number): V3 => [Math.cos(a) * 1.65, MAST.thoughtflowY, Math.sin(a) * 1.65];
+/* ---------------------------------------- Experience: a branching history */
+export const GIT = {
+  bottom: -3.6,
+  top: 3.7,
+  start: -3.1,
+  prejestFork: -2.2,
+  leave: [1.75, -1.55, 0.55] as V3,
+  attendance: [1.75, -0.75, 0.55] as V3,
+  merge: -0.05,
+  thoughtflow: 0.85,
+  now: 3.35,
+  teams: [
+    { label: "Video editors", at: [-1.45, 1.6, 0.4] as V3 },
+    { label: "Videographers", at: [-1.45, 2.26, -0.3] as V3 },
+    { label: "Graphic designers", at: [-1.45, 2.92, 0.4] as V3 },
+  ],
+} as const;
 
-/* ---------------------------------------- Achievements: BloodLink is what each form holds up */
-export const PODIUM = { left: -3.4, right: 3.4, apexY: 2.55, screenY: 0.75 } as const;
+/* ---------------------------------------- Achievements: BloodLink's network, recognised twice */
+export const MILESTONE = { left: -9, right: 9, y: 0.1 } as const;
 export const miniNetwork: readonly V3[] = [
   [0, 0, 0],
-  [0.48, 0.2, 0.16],
-  [-0.42, 0.26, -0.12],
-  [0.3, -0.34, -0.2],
-  [-0.34, -0.3, 0.2],
-  [0.02, 0.46, 0.1],
+  [0.96, 0.4, 0.32],
+  [-0.84, 0.52, -0.24],
+  [0.6, -0.68, -0.4],
+  [-0.68, -0.6, 0.4],
+  [0.04, 0.92, 0.2],
 ];
 
-/* ---------------------------------------- Education: two levels under the tower */
-export const FOUNDATION = { school: -2.3, degree: -0.75, schoolR: 2.9, degreeR: 2.05 } as const;
+/* ---------------------------------------- Education: a graph that grows towards the degree */
+export const KNOWLEDGE = {
+  school: [-1.45, -1.4, 0.1] as V3,
+  degree: [1.05, 0.9, 0.3] as V3,
+  schoolInfo: [
+    { label: "Science Stream", at: [-1.75, 0.15, -0.5] as V3 },
+    { label: "Class 12: 83%", at: [0.1, -2.35, 0.7] as V3 },
+  ],
+  degreeInfo: [
+    { label: "B.Sc. Computer Science", at: [-0.25, 2.5, -0.5] as V3 },
+    { label: "GPA 8.5 / 10", at: [2.1, -0.5, 0.3] as V3, end: true },
+  ],
+} as const;
 
-/* ---------------------------------------- Contact: everything so far, and an empty plot */
-export const THRESHOLD = {
-  base: -2.5,
-  plot: [0, -2.5, -13.2] as V3,
-  stops: work.map((item, i) => ({
-    label: item.label,
-    at: [i % 2 === 0 ? -1.3 : 1.3, 0.35, -1.6 - i * 2.4] as V3,
-  })),
-};
+/* ---------------------------------------- Contact: everything converging on one point */
+export const CONVERGE = {
+  streams: [
+    { label: "Technologies", from: [-2.9, 2.5, -1.4] as V3 },
+    { label: "Experiences", from: [1.9, 2.3, -1.8] as V3 },
+    { label: "Ideas", from: [2.6, -1.5, -1.2] as V3 },
+  ],
+} as const;
+
+/* ---------------------------------------- AI and ML: a small network, nothing more than it claims */
+const LAYER_X = [-3.3, -1.1, 1.1, 3.3];
+const LAYER_RADIUS = [1.25, 2.05, 2.05, 0.95];
+const LAYER_DEPTH = 0.62;
+/** Turns each ring so no two of its neurons line up one behind the other when seen from the front. */
+const LAYER_PHASE = [0.5, 0.26, 0.26, 0];
+
+export const neurons: readonly { at: V3; layer: number }[] = aiLayers.flatMap((layer, l) =>
+  Array.from({ length: layer.nodes }, (_, n) => {
+    const a = (n / layer.nodes) * Math.PI * 2 + LAYER_PHASE[l];
+    const r = LAYER_RADIUS[l];
+    return { layer: l, at: [LAYER_X[l], Math.sin(a) * r, Math.cos(a) * r * LAYER_DEPTH] as V3 };
+  }),
+);
+export const neuralRing = (l: number): { x: number; r: number; depth: number } => ({ x: LAYER_X[l], r: LAYER_RADIUS[l], depth: LAYER_DEPTH });
+
+/** Every neuron feeds every neuron in the next layer. */
+export const synapses: readonly (readonly [number, number])[] = neurons.flatMap((from, i) =>
+  neurons.flatMap((to, j) => (to.layer === from.layer + 1 ? [[i, j] as const] : [])),
+);
+
+function neuralLitTags(step: number) {
+  const out = [step];
+  synapses.forEach(([a, b], s) => {
+    if (a !== step && b !== step) return;
+    out.push(synapseTag(s), a === step ? b : a);
+  });
+  return out;
+}
 
 /* ---------------------------------------- Projected labels */
 export interface ModelLabelSpec {
@@ -229,45 +245,29 @@ export interface ModelLabelSpec {
   whenLit?: boolean;
 }
 
-const lifted = (at: V3, by: number): V3 => [at[0], at[1] + by, at[2]];
 const prejest = experience.find((e) => e.id === "prejest")!;
 const thoughtflow = experience.find((e) => e.id === "thoughtflow")!;
 const blood = projects.find((p) => p.id === "bloodlink")!;
+const lifted = (at: V3, by: number): V3 => [at[0], at[1] + by, at[2]];
 
 const AFTER_PREJEST: readonly PoseId[] = ["experience-prejest", "experience-thoughtflow"];
+const ABOUT: readonly PoseId[] = ["about-engineering", "about-creativity", "about-problem-solving", "about-leadership"];
+const AI_LABELS: readonly PoseId[] = ["ai-signal", "ai-depth", "ai-calm"];
 
 /** Non-interactive labels: the same facts are in the page's text, so these are decoration for assistive technology. */
 export const LABEL_SETS: readonly { poses: readonly PoseId[]; labels: readonly ModelLabelSpec[] }[] = [
   {
-    poses: ["about-engineering"],
+    poses: ABOUT,
     labels: [
-      ...engineeringLanes.flatMap((lane2) => [
-        { id: lane2.left, text: lane2.left, at: [ENGINEERING_X.left, STRATA.levels[0], lane2.z] as V3 },
-        { id: lane2.right, text: lane2.right, at: [ENGINEERING_X.right, STRATA.levels[0], lane2.z] as V3 },
-      ]),
-      { id: "auth", text: "JWT, role-based access", at: [ENGINEERING_X.rail, STRATA.levels[0], 2.1] as V3, align: "end" },
+      ...layerLabels,
+      { id: "problem", text: stackLayers[4].label, at: [ECOSYSTEM.problem[0] - 1.15, ECOSYSTEM.problem[1] + 0.1, ECOSYSTEM.problem[2]], tag: 4, align: "end" },
     ],
-  },
-  {
-    poses: ["about-creativity"],
-    labels: creativityArcs.map((a) => ({ id: a.label, text: a.label, at: creativityPoint(a.ring) })),
-  },
-  {
-    poses: ["about-problem-solving"],
-    labels: [
-      { id: "question", text: "Patients, donors, blood banks", at: TREE_START, align: "end" },
-      { id: "answer", text: blood.title, at: TREE_END },
-    ],
-  },
-  {
-    poses: ["about-leadership"],
-    labels: leadershipSpokes.map((s) => ({ id: s.label, text: s.label, at: spokePoint(s.angle) })),
   },
   {
     poses: ["bloodlink"],
     labels: [
       { id: "patient", text: "Patient", at: BLOOD.patient, align: "end" },
-      { id: "donor", text: "Donor", at: BLOOD.donor },
+      { id: "donor", text: "Donor", at: BLOOD.donor, align: "end" },
       ...BLOOD.frames.map((f) => {
         const [x, z] = bloodFrame(f.t);
         return { id: f.label, text: f.label, at: [x - f.r, BLOOD.ground, z + f.r] as V3, tag: SEARCH_LABEL_TAG, whenLit: true };
@@ -285,48 +285,59 @@ export const LABEL_SETS: readonly { poses: readonly PoseId[]; labels: readonly M
   },
   {
     poses: ["wanderlust"],
-    labels: listings.map((l, i) => ({ id: l.id, text: l.label, at: lifted(listingAt(l), l.top), tag: i })),
+    labels: [
+      ...listings.map((l, i) => ({ id: l.id, text: l.label, at: lifted(cardAt(l), CARD.h + 0.14), tag: i })),
+      { id: "search", text: "Search results", at: lifted(MAP.search, 0.42), align: "end" as const },
+    ],
   },
   {
     poses: AFTER_PREJEST,
     labels: [
-      { id: "prejest", text: prejest.company, at: [MAST.half, MAST.prejestY + 0.8, 0] },
-      { id: "leave", text: "Leave", at: lifted(leaveWing, 0.26) },
-      { id: "attendance", text: "Attendance", at: lifted(attendanceWing, 0.6) },
+      { id: "prejest", text: `${prejest.company} / ${prejest.role}`, at: [0.35, GIT.prejestFork, 0], align: "end" },
+      { id: "leave", text: "Leave module", at: GIT.leave },
+      { id: "attendance", text: "Attendance module", at: GIT.attendance },
     ],
   },
   {
     poses: ["experience-thoughtflow"],
     labels: [
-      { id: "thoughtflow", text: thoughtflow.company, at: [MAST.half, MAST.thoughtflowY + 0.8, 0] },
-      ...["Video editors", "Videographers", "Graphic designers"].map((text, i) => ({ id: text, text, at: teamPoint(TEAM_ANGLES[i]) })),
+      { id: "thoughtflow", text: `${thoughtflow.company} / ${thoughtflow.role}`, at: [0.35, GIT.thoughtflow, 0] },
+      ...GIT.teams.map((t) => ({ id: t.label, text: t.label, at: t.at, align: "end" as const })),
     ],
+  },
+  {
+    poses: AI_LABELS,
+    labels: aiLayers.map((layer, l) => ({ id: `layer-${l}`, text: layer.label, at: [LAYER_X[l], -LAYER_RADIUS[l] - 0.45, 0] as V3 })),
   },
   {
     poses: ["achievement-technovate"],
-    labels: [{ id: achievements[0].id, text: `${blood.title}, first prize`, at: [PODIUM.left + 0.7, PODIUM.apexY, 0] }],
+    labels: [{ id: achievements[0].id, text: `${blood.title}, first prize`, at: [MILESTONE.left - 0.75, MILESTONE.y + 1.32, 0] }],
   },
   {
     poses: ["achievement-policy"],
-    labels: [{ id: achievements[1].id, text: `${blood.title}, presented`, at: [PODIUM.right + 1.2, PODIUM.screenY, -1.7] }],
+    labels: [{ id: achievements[1].id, text: `${blood.title}, presented`, at: [MILESTONE.right - 0.62, MILESTONE.y + 1.1, 0] }],
   },
   {
     poses: ["education"],
-    labels: education.map((e, i) => ({
-      id: e.year,
-      text: `${e.year}  ${e.school}`,
-      at: (i === 0
-        ? [FOUNDATION.degreeR, FOUNDATION.degree, FOUNDATION.degreeR]
-        : [FOUNDATION.schoolR, FOUNDATION.school, FOUNDATION.schoolR]) as V3,
-      align: "end" as const,
-    })),
+    labels: [
+      ...education.map((e, i) => ({
+        id: e.year,
+        text: `${e.year}  ${e.school}`,
+        // The degree is on the right of the model, so its long name reads back across it rather than off the screen.
+        at: (i === 0 ? [KNOWLEDGE.degree[0] + 0.8, KNOWLEDGE.degree[1] + 0.62, KNOWLEDGE.degree[2]] : lifted(KNOWLEDGE.school, -0.62)) as V3,
+        align: i === 0 ? ("end" as const) : ("start" as const),
+      })),
+      ...[...KNOWLEDGE.schoolInfo, ...KNOWLEDGE.degreeInfo].map((n) => ({
+        id: n.label,
+        text: n.label,
+        at: n.at,
+        align: "end" in n ? ("end" as const) : ("start" as const),
+      })),
+    ],
   },
   {
     poses: ["contact"],
-    labels: [
-      ...THRESHOLD.stops.map((s, i) => ({ id: s.label, text: s.label, at: s.at, align: i % 2 === 0 ? ("end" as const) : ("start" as const) })),
-      { id: "next", text: "Next: yours", at: lifted(THRESHOLD.plot, 1.0) },
-    ],
+    labels: CONVERGE.streams.map((s) => ({ id: s.label, text: s.label, at: s.from, align: s.from[0] > 0 ? ("end" as const) : ("start" as const) })),
   },
 ];
 
@@ -335,57 +346,50 @@ export interface SkillNodeLayout {
   id: string;
   label: string;
   cluster: string;
-  clusterLabel: string;
   position: V3;
-  nodeIndex: number;
-  /** tag used by the beams touching this node */
-  edges: number[];
-  linked: string[];
 }
 
-export const clusterLayout: Record<string, { c: V3; r: number }> = {
-  languages: { c: [-1.85, 1.45, -1.6], r: 0.98 },
-  frontend: { c: [0.2, -1.05, 0.7], r: 1.08 },
-  backend: { c: [2.35, 1.15, -0.5], r: 1.08 },
-  databases: { c: [4.3, -1.35, -1.5], r: 0.72 },
-  tools: { c: [-3.75, -0.95, -0.8], r: 0.95 },
+export const clusterLayout: Record<string, { c: V3; r: number; phase?: number; labelBelow?: boolean }> = {
+  languages: { c: [-1.5, 1.45, -1.4], r: 0.98 },
+  frontend: { c: [0.15, -1.25, 0.5], r: 1.08 },
+  backend: { c: [1.7, 1.35, -0.5], r: 1.0 },
+  databases: { c: [3.2, -1.6, -1.0], r: 0.72 },
+  tools: { c: [-4.1, -1.15, -0.8], r: 0.95 },
+  ai: { c: [4.5, 0.95, -1.2], r: 0.86, phase: 0.95, labelBelow: true },
 };
 
-/**
- * Node indices and edge tags are worked out here rather than while building, because the forms are built in a worker
- * and the labels, which need the same numbers, live on the main thread.
- */
+/** Worked out here rather than while building, because the forms are built in a worker and the labels need the same positions. */
 export const skillLayout: SkillNodeLayout[] = (() => {
   const out: SkillNodeLayout[] = [];
-  let nodeIndex = 0;
-  let tag = 0;
   clusters.forEach((cluster) => {
-    const { c, r } = clusterLayout[cluster.id];
-    nodeIndex++; // the cluster's own hub
+    const { c, r, phase = 0.6 } = clusterLayout[cluster.id];
     const members = skills.filter((s) => s.cluster === cluster.id);
     members.forEach((s, i) => {
-      const a = (i / members.length) * Math.PI * 2 + 0.6;
+      const a = (i / members.length) * Math.PI * 2 + phase;
       out.push({
         id: s.id,
         label: s.label,
         cluster: cluster.id,
-        clusterLabel: cluster.label,
         position: [c[0] + Math.cos(a) * r * 1.2, c[1] + Math.sin(a) * r * 0.92, c[2] + Math.sin(a * 2) * 0.28],
-        nodeIndex: nodeIndex++,
-        edges: [tag++],
-        linked: [],
       });
     });
   });
-  skillLinks.forEach(([from, to]) => {
-    const P = out.find((s) => s.id === from);
-    const Q = out.find((s) => s.id === to);
-    if (!P || !Q) return;
-    const t = tag++;
-    P.edges.push(t);
-    Q.edges.push(t);
-    P.linked.push(Q.id);
-    Q.linked.push(P.id);
-  });
   return out;
 })();
+
+export const clusterLabels = clusters.map((cluster, i) => {
+  const { c, r, labelBelow } = clusterLayout[cluster.id];
+  return { id: cluster.id, text: cluster.label, tag: clusterTag(i), at: [c[0], c[1] + (r * 0.92 + 0.34) * (labelBelow ? -1 : 1), c[2]] as V3 };
+});
+
+function skillLitTags(step: number) {
+  const skill = skillLayout[step];
+  if (!skill) return [];
+  const out = [step, clusterTag(clusters.findIndex((c) => c.id === skill.cluster))];
+  skillLinks.forEach(([from, to], i) => {
+    if (from !== skill.id && to !== skill.id) return;
+    out.push(skillLinkTag(i));
+    out.push(skillLayout.findIndex((s) => s.id === (from === skill.id ? to : from)));
+  });
+  return out;
+}

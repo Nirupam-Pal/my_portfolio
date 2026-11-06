@@ -9,29 +9,26 @@ import { profile } from "@/data/profile";
 
 import { HeroModel, HeroModelCaption } from "./HeroModel";
 
-/** Static elevation of the tower, shown only when WebGL is unavailable. */
-function TowerDrawing() {
-  const floors = Array.from({ length: 15 }, (_, i) => {
-    const f = i / 14;
-    const twist = f * 1.25;
-    const w = 1.12 + 0.42 * Math.sin(f * Math.PI * 1.3 + 0.5);
-    const y = 490 - f * 460;
-    const dx = Math.cos(twist) * w * 62;
-    const skew = Math.sin(twist) * w * 16;
-    return { cx: 160 + 12 * Math.sin(f * 6), y, dx, skew };
-  });
+/** A still drawing of the machine, shown only when WebGL is unavailable. */
+function SystemDrawing() {
+  const links = ["M160 120V200", "M250 260H300", "M160 320V390", "M70 260H40"];
   return (
-    <svg viewBox="0 0 320 520" className="h-full w-full" fill="none" stroke="currentColor" strokeWidth="1" role="presentation">
-      {floors.map((p, i) => {
-        const prev = floors[i - 1];
-        return (
-          <g key={p.y} opacity={0.35 + (i / 14) * 0.55}>
-            <path d={`M${p.cx - p.dx} ${p.y - p.skew}L${p.cx + p.dx} ${p.y + p.skew}L${p.cx + p.dx * 0.7} ${p.y - p.skew - 8}L${p.cx - p.dx * 0.7} ${p.y - p.skew * 2 - 8}Z`} />
-            {prev && <path d={`M${prev.cx - prev.dx} ${prev.y - prev.skew}L${p.cx - p.dx} ${p.y - p.skew}M${prev.cx + prev.dx} ${prev.y + prev.skew}L${p.cx + p.dx} ${p.y + p.skew}`} />}
-          </g>
-        );
-      })}
-      <path d="M160 10V510" stroke="var(--color-sky)" strokeDasharray="2 6" />
+    <svg viewBox="0 0 340 480" className="h-full w-full" fill="none" stroke="currentColor" strokeWidth="1" role="presentation">
+      <g opacity="0.75">
+        <path d="M60 30h130v90H60z M78 54h94 M78 72h60" />
+        <path d="M205 58h95v62h-95z" opacity="0.6" />
+      </g>
+      <path d="M85 215h150l15 15v60l-15 15H85l-15-15v-60z" />
+      <path d="M100 235h120v50H100z" />
+      <circle cx="160" cy="260" r="11" fill="var(--color-sky)" stroke="none" />
+      <path d="M270 300h52v32h-52z M285 225h40v26h-40z M296 251v49" opacity="0.8" />
+      <ellipse cx="160" cy="400" rx="58" ry="12" />
+      <path d="M102 400v42c0 7 26 12 58 12s58-5 58-12v-42 M102 421c0 7 26 12 58 12s58-5 58-12" />
+      <g stroke="var(--color-sky)" strokeDasharray="2 6">
+        {links.map((d) => (
+          <path key={d} d={d} />
+        ))}
+      </g>
     </svg>
   );
 }
@@ -39,21 +36,21 @@ function TowerDrawing() {
 export function Hero() {
   return (
     <section id="home" data-hero aria-labelledby="hero-title" className="relative h-[165svh]">
-      {/* Scroll anchors for the camera: outside the tower at the top, inside it by the end. */}
+      {/* Scroll anchors for the camera: looking at the machine at the top, close inside it by the end. */}
       <div data-pose="hero" className="absolute inset-x-0 top-0 h-svh" />
       <div data-pose="through" className="absolute inset-x-0 -bottom-[8svh] h-px" />
 
-      {/* On large screens the name sits beneath the canvas, with the sculpture standing in front of the type. */}
+      {/* The name is set clear of the sculpture, which sits to the right of it and below its first line. */}
       <div className="z-hero-name sticky top-0 h-svh overflow-hidden">
         <div data-hero-name className="absolute inset-x-0 top-[max(5.75rem,12svh)] px-(--gutter) will-change-transform">
-          <h1 id="hero-title" className="display text-[length:var(--fs-hero)] leading-[0.8]">
+          <h1 id="hero-title" className="display hero-name leading-[0.8]">
             <Split text={"Nirupam\nPal."} hero />
           </h1>
         </div>
       </div>
 
-      <div className="webgl-fallback text-mute pointer-events-none absolute top-[10svh] right-(--gutter) h-[78svh] w-[46vw] max-w-xl opacity-70">
-        <TowerDrawing />
+      <div className="webgl-fallback text-mute pointer-events-none absolute top-[34svh] right-(--gutter) h-[60svh] w-[40vw] max-w-xl opacity-70 max-lg:top-[26svh] max-lg:w-[70vw] max-lg:opacity-30">
+        <SystemDrawing />
       </div>
 
       {/* Copy sits above the canvas and stays fully interactive. */}
@@ -66,33 +63,31 @@ export function Hero() {
             </p>
             <HeroModelCaption />
           </div>
-          <div className="grid gap-6 lg:grid-cols-12 lg:items-end">
-            <div className="hero-fade pointer-events-auto lg:col-span-7" style={{ "--d": "800ms" } as React.CSSProperties}>
-              <p className="font-display text-[clamp(1.2rem,1.85vw,2rem)] leading-[1.08] font-medium tracking-[-0.025em] uppercase">
-                Full-Stack Developer
-                <br />
-                Building Digital Experiences That Matter.
-              </p>
-              <p className="text-mute mt-3.5 max-w-[46ch] text-[0.95rem] leading-relaxed sm:text-base">{profile.statement}</p>
-            </div>
-            <div className="hero-fade pointer-events-auto flex flex-wrap items-center gap-3 lg:col-span-5 lg:justify-end" style={{ "--d": "950ms" } as React.CSSProperties}>
-              <Magnetic>
-                <TransitionLink href="#work" className="btn btn-primary">
-                  Explore My Work
-                  <ArrowDown aria-hidden="true" size={15} />
-                </TransitionLink>
-              </Magnetic>
-              <ButtonLink
-                href={profile.resume}
-                download={profile.resumeFileName}
-                variant="line"
-                icon={<ArrowUpRight aria-hidden="true" size={15} />}
-                ariaLabel="Download resume as a PDF"
-              >
-                Download Resume
-              </ButtonLink>
-              <ScrollHint />
-            </div>
+          <div className="hero-fade pointer-events-auto max-w-[44rem]" style={{ "--d": "800ms" } as React.CSSProperties}>
+            <p className="font-display text-[clamp(1.2rem,1.7vw,1.9rem)] leading-[1.08] font-medium tracking-[-0.025em] uppercase">
+              Full-Stack Developer
+              <br />
+              Building Digital Experiences That Matter.
+            </p>
+            <p className="text-mute mt-3.5 max-w-[46ch] text-[0.95rem] leading-relaxed sm:text-base">{profile.statement}</p>
+          </div>
+          <div className="hero-fade pointer-events-auto mt-6 flex flex-wrap items-center gap-3" style={{ "--d": "950ms" } as React.CSSProperties}>
+            <Magnetic>
+              <TransitionLink href="#work" className="btn btn-primary">
+                Explore My Work
+                <ArrowDown aria-hidden="true" size={15} />
+              </TransitionLink>
+            </Magnetic>
+            <ButtonLink
+              href={profile.resume}
+              download={profile.resumeFileName}
+              variant="line"
+              icon={<ArrowUpRight aria-hidden="true" size={15} />}
+              ariaLabel="Download resume as a PDF"
+            >
+              Download Resume
+            </ButtonLink>
+            <ScrollHint />
           </div>
         </div>
       </div>

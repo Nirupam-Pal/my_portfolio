@@ -5,23 +5,24 @@ import { usePathname } from "next/navigation";
 
 import { gsap, ScrollTrigger } from "@/animations/gsap";
 
-const SHEETS: Record<string, string> = {
-  home: "00 Elevation",
-  about: "01 Section",
+const SECTIONS: Record<string, string> = {
+  home: "00 Core",
+  about: "01 Ecosystem",
   work: "02 Selected Work",
   experience: "03 The Journey",
   skills: "04 Toolkit",
-  achievements: "05 Milestones",
-  education: "06 Foundation",
-  contact: "07 Threshold",
+  ai: "05 AI & ML",
+  achievements: "06 Milestones",
+  education: "07 Education",
+  contact: "08 Let's Talk",
 };
 
-/** The scroll indicator, drawn as an architect's dimension line, plus a title block naming the current sheet. */
+/** The scroll indicator, drawn as a measured line, plus a small block naming the current section. */
 export function ScrollRule() {
   const pathname = usePathname();
   const markerRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
-  const sheetRef = useRef<HTMLSpanElement>(null);
+  const sectionRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -38,13 +39,13 @@ export function ScrollRule() {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          const label = SHEETS[entry.target.id];
-          if (entry.isIntersecting && label && sheetRef.current) sheetRef.current.textContent = label;
+          const label = SECTIONS[entry.target.id];
+          if (entry.isIntersecting && label && sectionRef.current) sectionRef.current.textContent = label;
         });
       },
       { rootMargin: "-50% 0px -50% 0px" },
     );
-    Object.keys(SHEETS).forEach((id) => {
+    Object.keys(SECTIONS).forEach((id) => {
       const el = document.getElementById(id);
       if (el) observer.observe(el);
     });
@@ -70,9 +71,9 @@ export function ScrollRule() {
       </div>
 
       <div className="label bg-ink-0/75 absolute bottom-4 left-[calc(var(--gutter)-0.5rem)] hidden px-2 py-1 text-[0.64rem] xl:block [@media(max-height:760px)]:hidden">
-        The Digital Architect <span className="mx-2 opacity-50">/</span>
-        <span ref={sheetRef} className="text-paper">
-          {pathname === "/" ? SHEETS.home : "Case Study"}
+        The Computational Universe <span className="mx-2 opacity-50">/</span>
+        <span ref={sectionRef} className="text-paper">
+          {pathname === "/" ? SECTIONS.home : "Case Study"}
         </span>
       </div>
     </div>

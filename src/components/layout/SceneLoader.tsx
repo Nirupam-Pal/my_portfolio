@@ -30,7 +30,7 @@ export function SceneLoader() {
       return;
     }
 
-    // The name lands first, then the steel arrives around it.
+    // The name lands first, then the machine assembles beside it.
     let idle = 0;
     const start = () => setLoad(true);
     const timer = setTimeout(() => {

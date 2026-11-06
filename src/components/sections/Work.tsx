@@ -4,7 +4,7 @@ import { ArrowRight, ArrowUpRight, Award } from "lucide-react";
 import { GithubIcon } from "@/components/ui/BrandIcons";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { Magnetic } from "@/components/ui/Magnetic";
-import { SheetLabel } from "@/components/ui/SheetLabel";
+import { SectionLabel } from "@/components/ui/SectionLabel";
 import { Split } from "@/components/ui/Split";
 import { TransitionLink } from "@/components/ui/TransitionLink";
 import { projects, type Project } from "@/data/projects";
@@ -48,7 +48,7 @@ const LAYOUT = {
 
 function Captures({ project }: { project: Project }) {
   if (project.captures.length > 1) {
-    // Wanderlust: real listing photographs. Each one lights up with the house in the model that was built from it.
+    // Wanderlust: real listing photographs. Each one lights up with its card on the map in the model.
     return (
       <StepHost form={project.id} className="pointer-events-none grid grid-cols-3 gap-2 lg:absolute lg:right-0 lg:bottom-[5%] lg:w-[62%]">
         {project.captures.map((capture, i) => (
@@ -72,7 +72,6 @@ function Captures({ project }: { project: Project }) {
 }
 
 function ProjectPanel({ project }: { project: Project }) {
-  const external = !project.caseStudy;
   const layout = LAYOUT[project.layout];
   return (
     <article
@@ -141,14 +140,12 @@ function ProjectPanel({ project }: { project: Project }) {
             >
               Live Site
             </ButtonLink>
-            {project.caseStudy && (
-              <Magnetic>
-                <TransitionLink href={project.caseStudy} transitionLabel={project.title} className="btn btn-line">
-                  Case Study
-                  <ArrowRight aria-hidden="true" size={15} />
-                </TransitionLink>
-              </Magnetic>
-            )}
+            <Magnetic>
+              <TransitionLink href={project.caseStudy} transitionLabel={project.title} className="btn btn-line">
+                Case Study
+                <ArrowRight aria-hidden="true" size={15} />
+              </TransitionLink>
+            </Magnetic>
             <ButtonLink
               href={project.repo}
               external
@@ -164,28 +161,16 @@ function ProjectPanel({ project }: { project: Project }) {
 
       {/* The rest of the panel looks through to the model; the whole area opens the project. */}
       <div className={`relative mt-8 px-(--gutter) pb-16 lg:mt-0 lg:px-0 lg:pb-0 ${layout.stage}`}>
-        {external ? (
-          <a
-            href={project.live}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-cursor="view"
-            tabIndex={-1}
-            aria-hidden="true"
-            className="absolute inset-0 hidden lg:block"
-          />
-        ) : (
-          <TransitionLink
-            href={project.caseStudy!}
-            transitionLabel={project.title}
-            data-cursor="view"
-            tabIndex={-1}
-            aria-hidden="true"
-            className="absolute inset-0 hidden lg:block"
-          >
-            <span />
-          </TransitionLink>
-        )}
+        <TransitionLink
+          href={project.caseStudy}
+          transitionLabel={project.title}
+          data-cursor="view"
+          tabIndex={-1}
+          aria-hidden="true"
+          className="absolute inset-0 hidden lg:block"
+        >
+          <span />
+        </TransitionLink>
         {project.legend && <ProjectLegend items={project.legend} accent={project.accent} />}
         <ModelSteps form={project.id} title={project.flow.title} steps={project.flow.steps} accent={project.accent} className={layout.steps} />
         <p className={`label mb-3 text-[0.64rem] lg:absolute lg:top-[4%] lg:mb-0 ${layout.meta}`}>{project.conceptNote}</p>
@@ -193,71 +178,6 @@ function ProjectPanel({ project }: { project: Project }) {
         <p className={`label mt-2 text-[0.64rem] lg:absolute lg:bottom-0 lg:mt-0 ${layout.meta}`}>Live capture: {project.liveLabel}</p>
       </div>
     </article>
-  );
-}
-
-/** Screens from inside the app, sized so all four fit on one panel at any desktop height. */
-function GalleryPanel({ project }: { project: Project }) {
-  return (
-    <section
-      data-panel
-      data-pose={project.id}
-      aria-labelledby={`${project.id}-gallery-title`}
-      className="bg-ink-0/80 relative px-(--gutter) py-14 lg:flex lg:h-svh lg:w-screen lg:shrink-0 lg:flex-col lg:justify-center lg:bg-ink-0/70 lg:pt-20 lg:pb-12"
-    >
-      <p data-reveal="rise" className="label mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span style={{ color: project.accent }}>{project.title}</span>
-        <span aria-hidden="true" className="bg-line-strong h-px w-8" />
-        <span>Signed in</span>
-        <span aria-hidden="true" className="bg-line-strong hidden h-px w-8 sm:block" />
-        <span>Other members blurred for privacy</span>
-      </p>
-      <h4 id={`${project.id}-gallery-title`} data-reveal="rise" className="font-display mb-5 text-[clamp(1.5rem,2.4vw,2.25rem)] font-medium tracking-[-0.025em]">
-        Inside the app
-      </h4>
-      <ul className="gallery-grid m-0 grid list-none gap-x-5 gap-y-4 p-0 sm:grid-cols-2">
-        {project.gallery?.map((shot) => (
-          <li key={shot.src}>
-            <figure>
-              <div data-reveal="clip" className="capture-frame aspect-2/1">
-                <Image src={shot.src} alt={shot.alt} width={shot.width} height={shot.height} sizes="(min-width: 640px) 46vw, 92vw" className="h-full w-full object-cover object-top" />
-              </div>
-              <figcaption className="label mt-2 text-[0.64rem]">{shot.caption}</figcaption>
-            </figure>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/** The flagship gets a plate of its own before its details: the name, at full scale, inside its network. */
-function FlagshipPlate({ project }: { project: Project }) {
-  return (
-    <div
-      aria-hidden="true"
-      data-panel
-      data-pose="bloodlink-open"
-      className="exhibit-only relative h-svh w-screen shrink-0 flex-col justify-between px-(--gutter) pt-28 pb-12"
-    >
-      <p className="label flex items-center gap-3">
-        <span style={{ color: project.accent }}>Project {project.number}</span>
-        <span className="bg-line-strong h-px w-8" />
-        <span>The flagship</span>
-      </p>
-      <p className="display text-[min(18.5vw,44svh)] leading-[0.8]">{project.title}</p>
-      <div className="flex items-end justify-between gap-8">
-        <ul className="flex flex-col gap-1.5">
-          {project.achievements?.map((a) => (
-            <li key={a} className="text-gold flex items-center gap-2 font-mono text-[0.72rem] font-medium tracking-[0.05em] uppercase">
-              <Award size={14} className="shrink-0" />
-              {a}
-            </li>
-          ))}
-        </ul>
-        <p className="label text-right">Continue to the build &rarr;</p>
-      </div>
-    </div>
   );
 }
 
@@ -270,21 +190,17 @@ export function Work() {
           data-pose="work-intro"
           className="flex min-h-[70svh] flex-col justify-center px-(--gutter) pt-28 lg:h-svh lg:w-[78vw] lg:shrink-0 lg:pt-0"
         >
-          <SheetLabel sheet="02" title="The Main Showcase" className="mb-8" />
+          <SectionLabel index="02" title="The Main Showcase" className="mb-8" />
           <h2 id="work-title" data-reveal="chars" className="display heading-section">
             <Split text={"Selected\nWork."} />
           </h2>
           <p data-reveal="rise" className="text-mute mt-8 max-w-md leading-relaxed">
-            Three products, each shown twice: as a real capture of the live app, and as the same steel from the opening
-            sculpture, rebuilt into a model of how that product works.
+            Three products, each shown twice: as a real capture of the live app, and as the same modules from the opening
+            machine, rearranged into a model of how that product works.
           </p>
         </div>
         {projects.map((project) => (
-          <div key={project.id} className="contents">
-            {project.layout === "flagship" && <FlagshipPlate project={project} />}
-            <ProjectPanel project={project} />
-            {project.gallery && <GalleryPanel project={project} />}
-          </div>
+          <ProjectPanel key={project.id} project={project} />
         ))}
       </WorkExhibition>
     </section>

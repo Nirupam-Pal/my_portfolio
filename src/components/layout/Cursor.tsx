@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { canHover, gsap, prefersReducedMotion } from "@/animations/gsap";
 
-type CursorState = "default" | "link" | "view" | "drag" | "hidden";
+type CursorState = "default" | "link" | "view" | "hidden";
 
-const LABELS: Partial<Record<CursorState, string>> = { view: "View", drag: "Drag" };
+const LABELS: Partial<Record<CursorState, string>> = { view: "View" };
 
 /** A trailing ring that is drawn towards magnetic targets and announces what a click will do. */
 export function Cursor() {
@@ -42,7 +42,7 @@ export function Cursor() {
     const setState = (state: CursorState) => {
       ring.dataset.state = state;
       label.textContent = LABELS[state] ?? "";
-      dot.style.opacity = state === "view" || state === "drag" ? "0" : "1";
+      dot.style.opacity = state === "view" ? "0" : "1";
     };
 
     const onMove = (e: PointerEvent) => {

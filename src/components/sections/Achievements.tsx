@@ -1,4 +1,4 @@
-import { SheetLabel } from "@/components/ui/SheetLabel";
+import { SectionLabel } from "@/components/ui/SectionLabel";
 import { Split } from "@/components/ui/Split";
 import { achievements } from "@/data/profile";
 
@@ -6,7 +6,7 @@ export function Achievements() {
   return (
     <section id="achievements" aria-labelledby="achievements-title" className="z-content relative px-(--gutter)">
       <div data-pose="achievement-technovate" className="flex min-h-[86svh] flex-col justify-end pt-32 pb-10">
-        <SheetLabel sheet="05" title="Cinematic Highlights" className="mb-8" />
+        <SectionLabel index="06" title="Cinematic Highlights" className="mb-8" />
         <h2 id="achievements-title" data-reveal="chars" className="display text-[clamp(3rem,9.2vw,10rem)]">
           <Split text={"Milestones\nThat Matter."} />
         </h2>
