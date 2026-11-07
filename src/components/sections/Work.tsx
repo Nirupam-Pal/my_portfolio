@@ -44,7 +44,9 @@ function Captures({ project }: { project: Project }) {
         {project.captures.map((capture, i) => (
           <figure key={capture.src} data-step-item data-depth={3 + i * 2} className="listing-photo pointer-events-auto">
             <div data-reveal="clip" className="capture-frame">
-              <Image src={capture.src} alt={capture.alt} width={capture.width} height={capture.height} sizes="(min-width: 1024px) 14vw, 32vw" className="h-auto w-full scale-[1.06]" />
+              <div className="capture-drift">
+                <Image src={capture.src} alt={capture.alt} width={capture.width} height={capture.height} sizes="(min-width: 1024px) 14vw, 32vw" className="h-auto w-full scale-[1.06]" />
+              </div>
             </div>
           </figure>
         ))}
@@ -55,7 +57,9 @@ function Captures({ project }: { project: Project }) {
   return (
     <figure data-depth="5" className={`pointer-events-none lg:absolute ${LAYOUT[project.layout].capture}`}>
       <div data-reveal="clip" className="capture-frame">
-        <Image src={capture.src} alt={capture.alt} width={capture.width} height={capture.height} sizes="(min-width: 1024px) 28vw, 90vw" className="h-auto w-full" />
+        <div className="capture-drift">
+          <Image src={capture.src} alt={capture.alt} width={capture.width} height={capture.height} sizes="(min-width: 1024px) 28vw, 90vw" className="h-auto w-full" />
+        </div>
       </div>
     </figure>
   );
@@ -150,11 +154,12 @@ function ProjectPanel({ project }: { project: Project }) {
       </div>
 
       {/* The rest of the panel looks through to the model; the whole area opens the project. */}
-      <div className={`relative mt-8 px-(--gutter) pb-16 lg:mt-0 lg:px-0 lg:pb-0 ${layout.stage}`}>
+      <div data-pointer className={`project-stage relative mt-8 px-(--gutter) pb-16 lg:mt-0 lg:px-0 lg:pb-0 ${layout.stage}`}>
         <TransitionLink
           href={project.caseStudy}
           transitionLabel={project.title}
           data-cursor="view"
+          data-cursor-label="Case study"
           tabIndex={-1}
           aria-hidden="true"
           className="absolute inset-0 hidden lg:block"

@@ -23,7 +23,7 @@ export function Freelance() {
         <StepHost form="freelance" className="mt-14 lg:mt-12">
           <ul className="grid list-none gap-5 p-0 sm:grid-cols-2 xl:grid-cols-4">
             {freelanceProjects.map((project) => (
-              <li key={project.id} data-step-item data-reveal="rise" className="border-line bg-ink-1 group flex flex-col border">
+              <li key={project.id} data-step-item data-reveal="rise" data-pointer className="site-card border-line bg-ink-1 group relative flex flex-col border">
                 <div className="overflow-hidden">
                   <Image
                     src={project.image}

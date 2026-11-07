@@ -50,11 +50,11 @@ export function Navigation() {
 
   // One rule slides between items, measured only when the active item changes.
   useEffect(() => {
-    const place = () => {
+    const place = (target?: Element | null) => {
       const list = listRef.current;
       const bar = indicatorRef.current;
       if (!list || !bar) return;
-      const item = list.querySelector('[aria-current="true"]');
+      const item = target ?? list.querySelector('[aria-current="true"]');
       if (!item) {
         bar.style.opacity = "0";
         return;
@@ -64,10 +64,23 @@ export function Navigation() {
       bar.style.opacity = "1";
       bar.style.transform = `translateX(${box.left - list.getBoundingClientRect().left + inset}px) scaleX(${box.width - inset * 2})`;
     };
-    place();
-    window.addEventListener("resize", place);
-    document.fonts?.ready.then(place);
-    return () => window.removeEventListener("resize", place);
+    const home = () => place();
+    const point = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse") return;
+      const link = (e.target as Element).closest("a");
+      if (link) place(link);
+    };
+    const list = listRef.current;
+    home();
+    window.addEventListener("resize", home);
+    list?.addEventListener("pointerover", point);
+    list?.addEventListener("pointerleave", home);
+    document.fonts?.ready.then(home);
+    return () => {
+      window.removeEventListener("resize", home);
+      list?.removeEventListener("pointerover", point);
+      list?.removeEventListener("pointerleave", home);
+    };
   }, [active, isHome]);
 
   const dismissMenu = useCallback(() => {

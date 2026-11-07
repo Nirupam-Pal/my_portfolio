@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 
 import { Choreography } from "@/components/layout/Choreography";
 import { Cursor } from "@/components/layout/Cursor";
+import { PointerField } from "@/components/layout/PointerField";
 import { Navigation } from "@/components/layout/Navigation";
 import { PageTransition } from "@/components/layout/PageTransition";
 import { SceneLoader } from "@/components/layout/SceneLoader";
@@ -77,6 +78,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </main>
 
         <Cursor />
+        <PointerField />
         <PageTransition />
         <SmoothScroll />
         <Choreography />

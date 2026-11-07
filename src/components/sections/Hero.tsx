@@ -9,6 +9,7 @@ import { profile } from "@/data/profile";
 
 import { ExploringBadge } from "./ExploringBadge";
 import { HeroFit } from "./HeroFit";
+import { fitHeroName } from "./heroFitMeasure";
 import { HeroModel, HeroModelCaption } from "./HeroModel";
 
 /** A still drawing of the laptop and what it connects to, shown only when WebGL is unavailable. */
@@ -47,7 +48,8 @@ export function Hero() {
       {/* The name is set clear of the sculpture, which sits to the right of it and below its first line. */}
       <div className="z-hero-name sticky top-0 h-svh overflow-hidden">
         <div data-hero-name className="absolute inset-x-0 px-(--gutter) will-change-transform">
-          <h1 id="hero-title" className="display hero-name leading-[0.8]">
+          {/* The size is set by the inline script below before React arrives, so React leaves the style alone. */}
+          <h1 id="hero-title" className="display hero-name leading-[0.8]" suppressHydrationWarning>
             <Split text={"Nirupam\nPal."} hero />
           </h1>
         </div>
@@ -95,6 +97,9 @@ export function Hero() {
         </div>
       </div>
 
+      {/* Runs as the page is parsed, once the name and copy exist and the stylesheet has loaded, so the first paint
+          already shows the name at its fitted size rather than an estimate that shrinks a moment later. */}
+      <script dangerouslySetInnerHTML={{ __html: `(${fitHeroName.toString()})()` }} />
       <HeroFit />
       <HeroModel />
     </section>

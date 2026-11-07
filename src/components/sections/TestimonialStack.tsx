@@ -155,6 +155,7 @@ export function TestimonialStack({ children }: { children: ReactNode }) {
             >
               <motion.div
                 className="voice-hold"
+                data-cursor={focused && !reduced ? "drag" : undefined}
                 drag={focused ? "x" : false}
                 dragConstraints={{ left: 0, right: 0 }}
                 dragElastic={0.32}

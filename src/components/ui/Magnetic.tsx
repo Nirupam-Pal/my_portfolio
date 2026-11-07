@@ -27,13 +27,21 @@ export function Magnetic({ children, strength = 0.32, className = "" }: Magnetic
       x((e.clientX - (r.left + r.width / 2)) * strength);
       y((e.clientY - (r.top + r.height / 2)) * strength);
     };
-    const leave = () => {
+    // Which edge the pointer crossed, so a button's fill can enter and leave the way the hand went.
+    const edge = (e: PointerEvent) => {
+      const r = el.getBoundingClientRect();
+      el.dataset.edge = e.clientY < r.top + r.height / 2 ? "top" : "bottom";
+    };
+    const leave = (e: PointerEvent) => {
+      edge(e);
       x(0);
       y(0);
     };
+    el.addEventListener("pointerenter", edge);
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerleave", leave);
     return () => {
+      el.removeEventListener("pointerenter", edge);
       el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerleave", leave);
     };
