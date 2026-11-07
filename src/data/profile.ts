@@ -15,6 +15,8 @@ export const navItems = [
   { id: "home", label: "Home" },
   { id: "about", label: "About" },
   { id: "work", label: "Work" },
+  { id: "freelance", label: "Freelance" },
+  { id: "testimonials", label: "Testimonials" },
   { id: "experience", label: "Experience" },
   { id: "skills", label: "Skills" },
   { id: "ai", label: "AI & ML" },
@@ -65,7 +67,7 @@ export const education = [
   {
     year: "2026",
     school: "ICFAI University Tripura",
-    award: "Bachelor of Science in Computer Science",
+    award: "Bachelor of Technology in Computer Science",
     detail: "GPA 8.5 / 10",
     place: "Kamalghat, Tripura",
   },

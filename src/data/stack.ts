@@ -1,6 +1,6 @@
 /**
  * The system the 3D models are drawn from: what each layer of a full-stack application does, and what Nirupam uses
- * for it. The hero shows these as one working machine, and the About section pulls the same layers apart.
+ * for it. The hero shows these as one application around a laptop, and the About section pulls the same layers apart.
  */
 export const stackLayers = [
   {

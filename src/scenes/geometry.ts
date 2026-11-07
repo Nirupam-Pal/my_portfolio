@@ -12,6 +12,8 @@ import {
   BLOOD,
   bloodFrame,
   CARD,
+  CLIENT_SITES,
+  CLIENT_WINDOW,
   cardAt,
   clusterLayout,
   CONVERGE,
@@ -34,6 +36,7 @@ import {
   synapses,
   synapseTag,
   type V3,
+  LAPTOP,
 } from "./layouts";
 
 export const COUNT = { beams: 480, paths: 170, panels: 44, nodes: 96 } as const;
@@ -96,6 +99,11 @@ class FormBuilder {
 
   beam(a: V3, b: V3, t = 0.02, group = 0, tag = -1) {
     this.beamsList.push({ a, b, t, h: t, group, tag });
+  }
+
+  /** A flat plate from one edge to the other, level across its width: how something can tilt, like a lid. */
+  slab(a: V3, b: V3, width: number, thickness: number, group = 0, tag = -1) {
+    this.beamsList.push({ a, b, t: width, h: thickness, group, tag });
   }
 
   /** A solid machined block, turned by yaw around its vertical axis. Size is length, height, depth. */
@@ -262,50 +270,38 @@ const QUIET = 10;
 const plus = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const along = (a: V3, b: V3, t: number): V3 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
-/**
- * The machine at the centre of the hero, reused where the story returns to it. Precision layers around an open
- * heart of light, with four ports where the rest of the application connects. Deliberately not any real chip.
- */
-function coreBody(b: FormBuilder, c: V3, s: number, group = 0) {
+/** The laptop: a machined base with a keyboard and trackpad, and a tilted lid. The code on its screen is `codeScreen.ts`. */
+function laptopBody(b: FormBuilder, c: V3, s: number, group = 0) {
   const P = (x: number, y: number, z: number): V3 => [c[0] + x * s, c[1] + y * s, c[2] + z * s];
-  const plate = (y: number, size: number, h: number, yaw: number) => b.block(P(0, y, 0), [size * s, h * s, size * s], yaw, group);
+  const { width, depth, baseY, baseHeight, hinge, lidTop, lidThickness } = LAPTOP;
+  const top = baseY + baseHeight / 2;
 
-  plate(-1.08, 2.25, 0.14, 0);
-  b.ring(P(0, -0.76, 0), 1.08 * s, 0.34 * s, 0.2 * s, 8, group, -1, Math.PI / 8);
-  plate(-0.44, 1.62, 0.1, Math.PI / 4);
-  b.ring(P(0, 0, 0), 0.76 * s, 0.46 * s, 0.13 * s, 8, group);
-  plate(0.44, 1.62, 0.1, Math.PI / 4);
-  b.ring(P(0, 0.76, 0), 1.08 * s, 0.34 * s, 0.2 * s, 8, group, -1, Math.PI / 8);
-  // The cap is open in the middle, so the light inside shows from above as well.
-  [[0, -0.66], [0, 0.66]].forEach(([x, z]) => b.block(P(x, 1.08, z), [2.25 * s, 0.14 * s, 0.93 * s], 0, group));
-  [[-0.66, 0], [0.66, 0]].forEach(([x, z]) => b.block(P(x, 1.08, z), [0.93 * s, 0.14 * s, 0.4 * s], 0, group));
+  b.block(P(0, baseY, 0), [width * s, baseHeight * s, depth * s], 0, group);
+  b.slab(P(hinge[0], hinge[1], hinge[2]), P(lidTop[0], lidTop[1], lidTop[2]), width * s, lidThickness * s, group);
+  b.block(P(0, top + 0.012, hinge[2] + 0.02), [1.1 * s, 0.05 * s, 0.1 * s], 0, group);
 
-  // Ports, and the fine traces running out to them over each layer.
-  ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).forEach(([x, z], n) => {
-    const yaw = x === 0 ? Math.PI / 2 : 0;
-    b.block(P(x * 1.36, 0, z * 1.36), [0.5 * s, 0.26 * s, 0.34 * s], yaw, group);
-    b.block(P(x * 1.66, 0, z * 1.66), [0.1 * s, 0.4 * s, 0.5 * s], yaw, group);
-    const to = P(x * 1.62, 0.15, z * 1.62);
-    b.route([P(x * 0.5, 0.15, z * 0.5), P(x * 1.0, 0.15, z * 1.0), to], n * 0.2, 0.06);
-    const low = P(x * 1.62, -0.15, z * 1.62);
-    b.route([low, P(x * 1.0, -0.15, z * 1.0), P(x * 0.5, -0.15, z * 0.5)], 0.1 + n * 0.2, 0.06);
+  // The keyboard: rows of real keys over a soft backlight.
+  const keyW = 0.2;
+  const rows = [-0.72, -0.48, -0.24, 0];
+  b.panel(P(0, top + 0.004, -0.36), [1.42 * s, 0, 0], [0, 0, 0.5 * s], 0.2);
+  rows.forEach((z) => {
+    for (let k = 0; k < 12; k++) b.block(P((k - 5.5) * (keyW + 0.04), top + 0.02, z), [keyW * s, 0.036 * s, 0.19 * s], 0, group);
   });
+  b.block(P(0, top + 0.02, 0.24), [1.2 * s, 0.036 * s, 0.19 * s], 0, group);
+  [-1.2, -0.9, 0.9, 1.2].forEach((x) => b.block(P(x, top + 0.02, 0.24), [0.26 * s, 0.036 * s, 0.19 * s], 0, group));
 
-  // The heart: light moving between the layers.
-  for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-    const x = Math.cos(a) * 0.38;
-    const z = Math.sin(a) * 0.38;
-    b.route([P(x, -0.42, z), P(x, -0.14, z), P(x, 0.14, z), P(x, 0.42, z)], i * 0.25, 0.05);
-  }
-  b.panel(P(0, -0.2, 0), [0.62 * s, 0, 0], [0, 0, 0.62 * s], 0.75);
-  b.panel(P(0, 0.2, 0), [0.62 * s, 0, 0], [0, 0, 0.62 * s], 0.75);
-  b.node(P(0, 0, 0), 0.42 * s, group);
-  [-0.26, 0.26].forEach((y) => b.node(P(0, y, 0), 0.16 * s, group));
-  [0, 1, 2, 3].forEach((i) => {
-    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-    b.node(P(Math.cos(a) * 0.38, 0, Math.sin(a) * 0.38), 0.1 * s, 1);
-  });
+  // The trackpad.
+  const pad = { z: 0.73, w: 0.56, d: 0.24 };
+  const padCorners: V3[] = [P(-pad.w, top + 0.006, pad.z - pad.d), P(pad.w, top + 0.006, pad.z - pad.d), P(pad.w, top + 0.006, pad.z + pad.d), P(-pad.w, top + 0.006, pad.z + pad.d)];
+  b.polyline(padCorners, 0.012 * s, group, true);
+  b.panel(P(0, top + 0.004, pad.z), [pad.w * s, 0, 0], [0, 0, pad.d * s], 0.06);
+
+  // Light running along the hinge: this is where the work leaves the machine for everything around it.
+  const hingeLeft = P(-width / 2 + 0.06, top + 0.012, hinge[2] + 0.1);
+  const hingeRight = P(width / 2 - 0.06, top + 0.012, hinge[2] + 0.1);
+  b.route([P(0, top + 0.012, hinge[2] + 0.1), hingeRight], 0.1, 0.06);
+  b.route([P(0, top + 0.012, hinge[2] + 0.1), hingeLeft], 0.6, 0.06);
+  b.node(P(width / 2 - 0.2, top + 0.01, depth / 2 - 0.12), 0.05, 1);
 }
 
 /** A thin floating surface, drawn as an interface: a frame, a header and blocks of layout. Never fake code. */
@@ -355,14 +351,14 @@ function databaseStack(b: FormBuilder, c: V3, r: number, group: number, tag: num
 /** The hero: one full-stack application as a single floating machine, with a small network learning beside it. */
 function buildCore(): Form {
   const b = new FormBuilder(11, { min: [-3, -3, -2], max: [3, 3, 2] });
-  coreBody(b, [0, 0, 0], 1);
+  laptopBody(b, [0, 0, 0], 1);
 
-  // Frontend: thin screens hanging in the air above the core, tilted towards the viewer.
+  // Frontend: thin screens hanging in the air beside the laptop, tilted towards the viewer.
   const F = CORE.frontend;
   interfacePanel(b, plus(F, [-0.82, 0.1, -0.5]), [0.74, 0.02, 0.1], [0.04, 0.56, -0.2], 0, 0, 1);
   interfacePanel(b, plus(F, [0.25, 0.42, 0]), [0.82, 0, 0.04], [0, 0.6, -0.18], 0, 0, 0);
   interfacePanel(b, plus(F, [-0.3, -0.56, 0.75]), [0.62, -0.02, 0.12], [0.02, 0.42, -0.14], 0, 0, 2);
-  const frontPort: V3 = [0, 0, 1.72];
+  const frontPort: V3 = [-LAPTOP.width / 2, LAPTOP.baseY, 0.1];
   const frontDown: V3 = plus(F, [0.25, -0.2, 0.05]);
   const frontBend: V3 = [frontPort[0], frontDown[1] - 0.6, frontPort[2]];
   b.beam(frontPort, frontBend, 0.03, 0, 1);
@@ -395,7 +391,7 @@ function buildCore(): Form {
     b.beam(services[p].at, services[q].at, 0.022, 0, 2);
     b.route([services[p].at, along(services[p].at, services[q].at, 0.5), services[q].at], n * 0.22, 0.08, 2);
   });
-  const backPort: V3 = [1.72, 0, 0];
+  const backPort: V3 = [LAPTOP.width / 2, LAPTOP.baseY, 0];
   b.beam(backPort, services[0].at, 0.034, 0, 1);
   b.route([backPort, G, services[0].at], 0, 0.1, 1);
   b.route([services[0].at, plus(G, [0, 0.18, 0]), plus(backPort, [0, 0.18, 0])], 0.5, 0.1, 1);
@@ -411,9 +407,9 @@ function buildCore(): Form {
     }
   }
   const dbTop: V3 = [D[0] - 0.24, D[1] + 0.66, D[2]];
-  b.beam([0, -1.15, 0], dbTop, 0.034, 0, 1);
-  b.route([dbTop, [0, -1.15, 0]], 0.3, 0.1, 1);
-  b.route([[D[0] + 1.11, D[1] + 0.3, D[2] + 0.18], [0.55, -1.15, 0.2]], 0.65, 0.1, 1);
+  b.beam([0, LAPTOP.baseY - 0.05, 0], dbTop, 0.034, 0, 1);
+  b.route([dbTop, [0, LAPTOP.baseY - 0.05, 0]], 0.3, 0.1, 1);
+  b.route([[D[0] + 1.11, D[1] + 0.3, D[2] + 0.18], [0.55, LAPTOP.baseY - 0.05, 0.2]], 0.65, 0.1, 1);
 
   // A much smaller cluster to the side: the part still being learned.
   const A = CORE.ai;
@@ -433,13 +429,13 @@ function buildCore(): Form {
   });
   b.route([world[0][0], world[1][1], world[2][0]], 0.1, 0.1, 4);
   b.route([world[0][2], world[1][2], world[2][1]], 0.55, 0.1, 4);
-  b.route([[0.9, 1.1, -0.2], plus(A, [-0.62, -0.46, 0])], 0.3, 0.1, 1);
+  b.route([[0.9, LAPTOP.lidTop[1], LAPTOP.lidTop[2]], plus(A, [-0.62, -0.46, 0])], 0.3, 0.1, 1);
 
   return b.finish("core");
 }
 
 /**
- * About: the hero's machine pulled apart along one axis, so each layer can be read by itself and the data can be seen
+ * About: the application from the hero, pulled apart along one axis, so each layer can be read by itself and the data can be seen
  * passing through all of them. Tags and groups are the layers, in stackLayers' order.
  */
 function buildEcosystem(spread: number): Form {
@@ -1077,12 +1073,12 @@ function buildKnowledge(): Form {
 /** Contact: the hero's core again, with every stream of the page arriving at it. */
 function buildConvergence(): Form {
   const b = new FormBuilder(127, { min: [-6, -3.5, -3], max: [6, 4.5, 2] });
-  coreBody(b, [0, 0, 0], 0.9);
-  CONVERGE.streams.forEach(({ from }, s) => {
+  laptopBody(b, [0, 0, 0], LAPTOP.scales.convergence ?? 1);
+  CONVERGE.streams.forEach(({ from, to }, s) => {
     for (let i = 0; i < 9; i++) {
       const a = (i / 9) * Math.PI * 2;
       const start: V3 = [from[0] + Math.cos(a) * 0.65 * (1 + (i % 3) * 0.3), from[1] + Math.sin(a) * 0.65, from[2] + Math.sin(a * 2) * 0.5];
-      const end: V3 = [from[0] * 0.2, from[1] * 0.2, from[2] * 0.2];
+      const end: V3 = [to[0] + Math.cos(a) * 0.1, to[1], to[2] + Math.sin(a) * 0.1];
       const pts: V3[] = Array.from({ length: 7 }, (_, k) => {
         const t = k / 6;
         const e = 1 - (1 - t) * (1 - t);
@@ -1096,6 +1092,27 @@ function buildConvergence(): Form {
     b.node(from, 0.2, 1);
   });
   return b.finish("convergence");
+}
+
+/** Freelance: the laptop from the hero, with each site it put live as a window of its own, one per client. */
+function buildFreelance(): Form {
+  const b = new FormBuilder(131, { min: [-4, -3.5, -2], max: [4, 3.5, 2] });
+  const s = LAPTOP.scales.freelance ?? 1;
+  laptopBody(b, [0, 0, 0], s);
+  CLIENT_SITES.forEach((c, i) => {
+    interfacePanel(b, c, [CLIENT_WINDOW.w, 0, 0.03], [0, CLIENT_WINDOW.h, -0.06], 0, i, [0, 1, 2, 0][i]);
+    const left = c[0] < 0;
+    const below = c[1] < 0;
+    const from: V3 = below
+      ? [(left ? -1 : 1) * (LAPTOP.width / 2) * s, LAPTOP.baseY * s, 0.3]
+      : [(left ? -1 : 1) * (LAPTOP.width / 2) * s, LAPTOP.lidTop[1] * s, LAPTOP.lidTop[2] * s];
+    const to: V3 = [c[0], c[1] + (below ? CLIENT_WINDOW.h : -CLIENT_WINDOW.h), c[2]];
+    const bend: V3 = [to[0], from[1], (from[2] + to[2]) / 2];
+    b.polyline([from, bend, to], 0.024, 0, false, i);
+    b.route([from, bend, to], i * 0.25, 0.08, i);
+    b.node(to, 0.12, 1, i);
+  });
+  return b.finish("freelance");
 }
 
 function mapForm(
@@ -1184,6 +1201,7 @@ function buildScatter(core: Form): Form {
 export type FormId =
   | "scatter"
   | "core"
+  | "freelance"
   | "ecosystemPacked"
   | "ecosystem"
   | "bloodlink"
@@ -1202,6 +1220,7 @@ export function buildForms(): Record<FormId, Form> {
   return {
     scatter: buildScatter(core),
     core,
+    freelance: buildFreelance(),
     ecosystemPacked: buildEcosystem(ECOSYSTEM.packed),
     ecosystem: buildEcosystem(ECOSYSTEM.spread),
     bloodlink: buildBloodLink(),

@@ -1,7 +1,8 @@
 import * as THREE from "three";
 
+import { CodeScreen } from "./codeScreen";
 import { COUNT, STRIDE, type Form, type FormId } from "./geometry";
-import { focusPointFor, litTagsFor } from "./layouts";
+import { focusPointFor, LAPTOP, litTagsFor } from "./layouts";
 import { POSE_IDS, POSES, type Pose, type PoseId } from "./poses";
 import { sceneStore as store } from "./store";
 
@@ -352,6 +353,7 @@ export class SculptureEngine {
   private pathMaterial: THREE.ShaderMaterial;
   private panelMaterial: THREE.ShaderMaterial;
   private nodeMaterial: THREE.ShaderMaterial;
+  private codeScreen: CodeScreen;
   private brightness = new Float32Array(COUNT.beams).fill(1);
   private nodeLevel = new Float32Array(COUNT.nodes).fill(1);
   private pathLevel = new Float32Array(COUNT.paths).fill(1);
@@ -538,7 +540,8 @@ export class SculptureEngine {
       this.nodeDock[i] = dock(core.nodes[o], core.nodes[o + 1], core.nodes[o + 2]);
     }
 
-    this.group.add(this.beamMesh, this.panelMesh, this.pathMesh, this.nodeMesh);
+    this.codeScreen = new CodeScreen(this.drift);
+    this.group.add(this.beamMesh, this.panelMesh, this.pathMesh, this.nodeMesh, this.codeScreen.mesh);
     threeScene.add(this.group);
 
     if (typeof document !== "undefined") {
@@ -576,8 +579,9 @@ export class SculptureEngine {
       let bx = lerp(A[o + 3], B[o + 3], k);
       let by = lerp(A[o + 4], B[o + 4], k);
       let bz = lerp(A[o + 5], B[o + 5], k);
-      // Parts thin to drawn lines while travelling, so a morph reads as a sketch, never as rubble.
-      const thin = 1 - 0.68 * bump(k);
+      // Parts thin to drawn lines while travelling, so a morph reads as a sketch, never as rubble. Only between forms:
+      // moving the camera around one form leaves it solid.
+      const thin = a === b ? 1 : 1 - 0.68 * bump(k);
       let th = lerp(A[o + 6], B[o + 6], k) * thin;
       let hh = lerp(A[o + 7], B[o + 7], k) * thin;
 
@@ -932,7 +936,7 @@ export class SculptureEngine {
     const clipA = A.clip ?? NO_CLIP;
     const clipB = B.clip ?? NO_CLIP;
     this.clip.value.set(lerp(clipA[0], clipB[0], mix), lerp(clipA[1], clipB[1], mix), lerp(clipA[2], clipB[2], mix), lerp(clipA[3], clipB[3], mix));
-    // Once the machine has assembled, one front of light runs out through it.
+    // Once the sculpture has assembled, one front of light runs out through it.
     if (reduced || this.frontClock > 2.8) {
       this.front.value = -1;
     } else if (assemble > 0.86) {
@@ -974,7 +978,7 @@ export class SculptureEngine {
     this.focus.lerp(this.focusTarget, 1 - Math.exp(-3 * dt));
 
     const sway = reduced ? 0 : Math.sin(t * 0.09) * 0.05;
-    // The entrance: the machine turns into place while the camera settles back to its mark.
+    // The entrance: the sculpture turns into place while the camera settles back to its mark.
     const arrival = 1 - smoothstep(assemble);
     this.group.rotation.set(
       lerp(A.pitch, B.pitch, mix) + this.pointerY * 0.05,
@@ -1050,6 +1054,13 @@ export class SculptureEngine {
     node.uTime.value = t;
     node.uFog.value.set(near, far);
 
+    // The code only belongs on the lid once the lid has landed, so it arrives after the morph and leaves before it.
+    const scaleA = LAPTOP.scales[A.form] ?? 0;
+    const scaleB = LAPTOP.scales[B.form] ?? 0;
+    const onLaptop = (scaleA > 0 ? 1 - mix : 0) + (scaleB > 0 ? mix : 0);
+    const landed = smoothstep(clamp01((assemble - 0.7) / 0.3));
+    this.codeScreen.update(smoothstep(clamp01((onLaptop - 0.6) / 0.4)) * landed, mix < 0.5 ? scaleA || scaleB : scaleB || scaleA, t, dt, reduced);
+
     // Page-level effects, written as opacity only so they stay on the compositor.
     const opacityA = portrait ? A.portraitOpacity : A.opacity;
     const opacityB = portrait ? B.portraitOpacity : B.opacity;
@@ -1065,6 +1076,7 @@ export class SculptureEngine {
   }
 
   dispose() {
+    this.codeScreen.dispose();
     this.group.removeFromParent();
     for (const mesh of [this.beamMesh, this.pathMesh, this.panelMesh, this.nodeMesh]) {
       mesh.geometry.dispose();

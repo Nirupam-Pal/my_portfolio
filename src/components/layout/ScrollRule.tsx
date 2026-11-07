@@ -6,15 +6,17 @@ import { usePathname } from "next/navigation";
 import { gsap, ScrollTrigger } from "@/animations/gsap";
 
 const SECTIONS: Record<string, string> = {
-  home: "00 Core",
+  home: "00 Home",
   about: "01 Ecosystem",
   work: "02 Selected Work",
-  experience: "03 The Journey",
-  skills: "04 Toolkit",
-  ai: "05 AI & ML",
-  achievements: "06 Milestones",
-  education: "07 Education",
-  contact: "08 Let's Talk",
+  freelance: "03 Freelance",
+  testimonials: "04 Testimonials",
+  experience: "05 The Journey",
+  skills: "06 Toolkit",
+  ai: "07 AI & ML",
+  achievements: "08 Milestones",
+  education: "09 Education",
+  contact: "10 Let's Talk",
 };
 
 /** The scroll indicator, drawn as a measured line, plus a small block naming the current section. */

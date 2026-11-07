@@ -16,7 +16,7 @@ export function Skills() {
       className="z-content relative min-h-svh lg:h-[170svh]"
     >
       <div className="px-(--gutter) pt-36 pb-24 lg:sticky lg:top-0 lg:h-svh lg:pt-24 lg:pb-0">
-        <SectionLabel index="04" title="Technology Graph" className="mb-6" />
+        <SectionLabel index="06" title="Technology Graph" className="mb-6" />
         <h2 id="skills-title" data-reveal="chars" className="display text-[clamp(3.4rem,6vw,7rem)]">
           <Split text={"My\nToolkit."} />
         </h2>

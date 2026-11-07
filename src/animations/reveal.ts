@@ -66,11 +66,26 @@ export function observeReveals(scope: HTMLElement | null = null) {
   const targets = [...(scope ?? document).querySelectorAll<HTMLElement>("[data-reveal]")].filter(
     (el) => el.closest("[data-reveal-scope]") === scope,
   );
-  targets.forEach((el) => observer.observe(el));
+  targets.forEach((el) => {
+    // Hydrating this late, the failsafe may already be showing it. Text someone can see stays as it is.
+    if (getComputedStyle(el).visibility === "visible") {
+      const { top, bottom } = el.getBoundingClientRect();
+      if (bottom > 0 && top < window.innerHeight) {
+        el.style.visibility = "visible";
+        return;
+      }
+    }
+    // Stand the failsafe down: if it uncovered text waiting below the fold, the reveal would blank that text and replay it in view.
+    el.style.animation = "none";
+    observer.observe(el);
+  });
 
   return () => {
     observer.disconnect();
     animations.forEach((a) => a.revert());
-    targets.forEach((el) => el.style.removeProperty("visibility"));
+    targets.forEach((el) => {
+      el.style.removeProperty("visibility");
+      el.style.removeProperty("animation");
+    });
   };
 }

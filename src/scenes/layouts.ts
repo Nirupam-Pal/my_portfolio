@@ -5,6 +5,7 @@
 import { aiLayers } from "@/data/ai";
 import { achievements, education } from "@/data/profile";
 import { experience } from "@/data/experience";
+import { freelanceProjects } from "@/data/freelance";
 import { projects } from "@/data/projects";
 import { clusters, skillLinks, skills } from "@/data/skills";
 import { heroSystems, stackLayers } from "@/data/stack";
@@ -47,20 +48,44 @@ export function focusPointFor(form: string, step: number): V3 | null {
   return null;
 }
 
-/* ---------------------------------------- Hero: one application, seen as a system */
+/* ---------------------------------------- Hero: a developer's laptop, and the application it is building */
+const LID_TILT = 0.26;
+const LID_HEIGHT = 2.2;
+const HINGE: V3 = [0, -0.95, -1.05];
+const LID_THICKNESS = 0.07;
+export const LAPTOP = {
+  width: 3.4,
+  depth: 2.2,
+  baseY: -1.0,
+  baseHeight: 0.1,
+  hinge: HINGE,
+  lidTop: [0, HINGE[1] + Math.cos(LID_TILT) * LID_HEIGHT, HINGE[2] - Math.sin(LID_TILT) * LID_HEIGHT] as V3,
+  lidThickness: LID_THICKNESS,
+  tilt: LID_TILT,
+  screen: { w: 3.14, h: 1.96 },
+  /** Halfway up the lid, just proud of its face. */
+  screenCentre: [
+    0,
+    HINGE[1] + Math.cos(LID_TILT) * LID_HEIGHT * 0.5 + Math.sin(LID_TILT) * (LID_THICKNESS / 2 + 0.012),
+    HINGE[2] - Math.sin(LID_TILT) * LID_HEIGHT * 0.5 + Math.cos(LID_TILT) * (LID_THICKNESS / 2 + 0.012),
+  ] as V3,
+  /** The forms with the laptop in them, at the size each one builds it. */
+  scales: { core: 1, convergence: 0.9, freelance: 0.8 } as Partial<Record<string, number>>,
+} as const;
+
 export const CORE = {
-  frontend: [-2.6, 1.28, 0.75] as V3,
-  backend: [3.0, -0.1, -0.2] as V3,
+  frontend: [-2.95, 1.28, 0.75] as V3,
+  backend: [3.45, -0.1, -0.2] as V3,
   database: [0.15, -2.55, 0.35] as V3,
-  gateway: [1.72, -0.02, -0.1] as V3,
+  gateway: [2.3, -0.5, -0.08] as V3,
   ai: [2.25, 2.3, -0.8] as V3,
 } as const;
 
 /** Each name sits just outside its part, on the side with open space, so it never lands on the geometry. */
 const HERO_LABEL_AT: Record<string, { at: V3; end?: boolean }> = {
-  frontend: { at: [-3.72, 1.9, 0.75], end: true },
-  api: { at: [1.72, -0.86, -0.1] },
-  backend: { at: [3.3, -1.3, -0.2] },
+  frontend: { at: [-4.07, 1.9, 0.75], end: true },
+  api: { at: [1.95, -1.3, -0.1] },
+  backend: { at: [3.75, -1.3, -0.2] },
   database: { at: [1.45, -3.1, 0.35] },
   ai: { at: [2.05, 3.2, -0.8] },
 };
@@ -151,6 +176,15 @@ export const pinAt = (l: (typeof listings)[number]): V3 => [l.x, MAP.y, l.z];
 export const cardAt = (l: (typeof listings)[number]): V3 => [l.x, MAP.y + l.lift, l.z];
 export const CARD = { w: 0.86, h: 0.62 } as const;
 
+/* ---------------------------------------- Freelance: the laptop, and the sites that went live from it */
+export const CLIENT_SITES: readonly V3[] = [
+  [-1.95, 2.25, 0.2],
+  [1.95, 2.25, 0.2],
+  [-1.95, -2.3, 0.4],
+  [1.95, -2.3, 0.4],
+];
+export const CLIENT_WINDOW = { w: 0.86, h: 0.6 } as const;
+
 /* ---------------------------------------- Experience: a branching history */
 export const GIT = {
   bottom: -3.6,
@@ -189,7 +223,7 @@ export const KNOWLEDGE = {
     { label: "Class 12: 83%", at: [0.1, -2.35, 0.7] as V3 },
   ],
   degreeInfo: [
-    { label: "B.Sc. Computer Science", at: [-0.25, 2.5, -0.5] as V3 },
+    { label: "B.Tech Computer Science", at: [-0.25, 2.5, -0.5] as V3 },
     { label: "GPA 8.5 / 10", at: [2.1, -0.5, 0.3] as V3, end: true },
   ],
 } as const;
@@ -197,9 +231,9 @@ export const KNOWLEDGE = {
 /* ---------------------------------------- Contact: everything converging on one point */
 export const CONVERGE = {
   streams: [
-    { label: "Technologies", from: [-2.9, 2.5, -1.4] as V3 },
-    { label: "Experiences", from: [1.9, 2.3, -1.8] as V3 },
-    { label: "Ideas", from: [2.6, -1.5, -1.2] as V3 },
+    { label: "Technologies", from: [-2.9, 2.05, -1.4] as V3, to: [-1.1, 0.98, -1.5] as V3 },
+    { label: "Experiences", from: [1.9, 2.05, -1.8] as V3, to: [0.9, 0.98, -1.5] as V3 },
+    { label: "Ideas", from: [2.6, -1.5, -1.2] as V3, to: [1.5, -0.9, 0] as V3 },
   ],
 } as const;
 
@@ -289,6 +323,17 @@ export const LABEL_SETS: readonly { poses: readonly PoseId[]; labels: readonly M
       ...listings.map((l, i) => ({ id: l.id, text: l.label, at: lifted(cardAt(l), CARD.h + 0.14), tag: i })),
       { id: "search", text: "Search results", at: lifted(MAP.search, 0.42), align: "end" as const },
     ],
+  },
+  {
+    poses: ["freelance"],
+    labels: freelanceProjects.map((project, i) => ({
+      id: project.id,
+      text: project.title,
+      // The windows on the right read back across themselves, so a long name can't run off the screen.
+      at: [CLIENT_SITES[i][0] + (i % 2 ? CLIENT_WINDOW.w : -CLIENT_WINDOW.w), CLIENT_SITES[i][1] + CLIENT_WINDOW.h + 0.2, CLIENT_SITES[i][2]] as V3,
+      align: i % 2 ? ("end" as const) : ("start" as const),
+      tag: i,
+    })),
   },
   {
     poses: AFTER_PREJEST,

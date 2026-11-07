@@ -9,7 +9,7 @@ import { profile } from "@/data/profile";
 
 import { HeroModel, HeroModelCaption } from "./HeroModel";
 
-/** A still drawing of the machine, shown only when WebGL is unavailable. */
+/** A still drawing of the laptop and what it connects to, shown only when WebGL is unavailable. */
 function SystemDrawing() {
   const links = ["M160 120V200", "M250 260H300", "M160 320V390", "M70 260H40"];
   return (
@@ -18,9 +18,11 @@ function SystemDrawing() {
         <path d="M60 30h130v90H60z M78 54h94 M78 72h60" />
         <path d="M205 58h95v62h-95z" opacity="0.6" />
       </g>
-      <path d="M85 215h150l15 15v60l-15 15H85l-15-15v-60z" />
-      <path d="M100 235h120v50H100z" />
-      <circle cx="160" cy="260" r="11" fill="var(--color-sky)" stroke="none" />
+      <path d="M90 205h140a6 6 0 0 1 6 6v84H84v-84a6 6 0 0 1 6-6z" />
+      <path d="M62 295h196l14 18H48z" />
+      <g stroke="var(--color-sky)">
+        <path d="M100 224h46 M100 240h22 M130 240h58 M100 256h78 M100 272h36" />
+      </g>
       <path d="M270 300h52v32h-52z M285 225h40v26h-40z M296 251v49" opacity="0.8" />
       <ellipse cx="160" cy="400" rx="58" ry="12" />
       <path d="M102 400v42c0 7 26 12 58 12s58-5 58-12v-42 M102 421c0 7 26 12 58 12s58-5 58-12" />
@@ -36,7 +38,7 @@ function SystemDrawing() {
 export function Hero() {
   return (
     <section id="home" data-hero aria-labelledby="hero-title" className="relative h-[165svh]">
-      {/* Scroll anchors for the camera: looking at the machine at the top, close inside it by the end. */}
+      {/* Scroll anchors for the camera: looking at the laptop at the top, close on its screen by the end. */}
       <div data-pose="hero" className="absolute inset-x-0 top-0 h-svh" />
       <div data-pose="through" className="absolute inset-x-0 -bottom-[8svh] h-px" />
 

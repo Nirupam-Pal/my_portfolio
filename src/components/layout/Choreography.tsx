@@ -44,7 +44,7 @@ export function Choreography() {
         );
       });
 
-      // The hero's copy leaves as the camera moves into the machine.
+      // The hero's copy leaves as the camera moves in on the laptop.
       const heroCopy = document.querySelector("[data-hero-copy]");
       const heroName = document.querySelector("[data-hero-name]");
       const hero = document.querySelector("[data-hero]");

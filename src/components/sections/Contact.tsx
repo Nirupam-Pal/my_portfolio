@@ -19,7 +19,7 @@ export function Contact() {
       aria-labelledby="contact-title"
       className="z-content relative flex min-h-svh flex-col justify-end px-(--gutter) pt-36 pb-8 lg:pt-24"
     >
-      <SectionLabel index="08" title="Converging Network" className="mb-8" />
+      <SectionLabel index="10" title="Converging Network" className="mb-8" />
       <h2 id="contact-title" data-reveal="chars" className="display text-[clamp(2.65rem,min(9.4vw,13.5svh),10.5rem)]">
         <Split text={"Let's Build\nSomething\nExtraordinary."} />
       </h2>

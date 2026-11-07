@@ -8,8 +8,10 @@ import { ArtificialIntelligence } from "@/components/sections/ArtificialIntellig
 import { Contact } from "@/components/sections/Contact";
 import { Education } from "@/components/sections/Education";
 import { Experience } from "@/components/sections/Experience";
+import { Freelance } from "@/components/sections/Freelance";
 import { Hero } from "@/components/sections/Hero";
 import { Skills } from "@/components/sections/Skills";
+import { Testimonials } from "@/components/sections/Testimonials";
 import { Work } from "@/components/sections/Work";
 
 /** The boundary lets React hydrate each section in its own task instead of one long one. */
@@ -31,6 +33,12 @@ export default function HomePage() {
       </Deferred>
       <Deferred>
         <Work />
+      </Deferred>
+      <Deferred>
+        <Freelance />
+      </Deferred>
+      <Deferred>
+        <Testimonials />
       </Deferred>
       <Deferred>
         <Experience />

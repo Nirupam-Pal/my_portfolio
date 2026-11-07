@@ -9,7 +9,7 @@ import { PauseModels, StepHost } from "./ModelSteps";
 
 const HERO_POSES: readonly PoseId[] = ["hero"];
 
-/** Names the parts of the machine. Each name is a real button that holds the sculpture on that part. */
+/** Names the parts of the system. Each name is a real button that holds the sculpture on that part. */
 export function HeroModel() {
   const shows = useShowsLabels();
   return shows ? <HeroLabels /> : null;

@@ -35,7 +35,7 @@ export function ArtificialIntelligence() {
 
       <div className="ai-pin px-(--gutter) pt-[46svh] pb-24 lg:sticky lg:top-0 lg:flex lg:h-svh lg:flex-col lg:justify-center lg:pt-16 lg:pb-0">
         <div className="bg-ink-0/60 -mx-(--gutter) px-(--gutter) py-6 lg:mx-0 lg:max-w-[40rem] lg:bg-transparent lg:px-0 lg:py-0">
-          <SectionLabel index="05" title={aiCopy.eyebrow} className="mb-6" />
+          <SectionLabel index="07" title={aiCopy.eyebrow} className="mb-6" />
           <h2 id="ai-title" data-reveal="chars" className="display text-[clamp(3rem,6.4vw,7.25rem)]">
             <Split text={aiCopy.title} />
           </h2>

@@ -91,7 +91,7 @@ export function Navigation() {
               <span aria-hidden="true" className="border-line-strong flex h-9 w-9 items-center justify-center border text-[0.8rem]">
                 NP
               </span>
-              <span className="hidden sm:inline">Nirupam Pal</span>
+              <span className="hidden sm:inline lg:hidden xl:inline">Nirupam Pal</span>
             </TransitionLink>
           </Magnetic>
 

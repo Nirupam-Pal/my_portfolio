@@ -196,7 +196,7 @@ export function Work() {
           </h2>
           <p data-reveal="rise" className="text-mute mt-8 max-w-md leading-relaxed">
             Three products, each shown twice: as a real capture of the live app, and as the same modules from the opening
-            machine, rearranged into a model of how that product works.
+            model, rearranged into a model of how that product works.
           </p>
         </div>
         {projects.map((project) => (

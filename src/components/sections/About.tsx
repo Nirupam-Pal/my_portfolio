@@ -17,7 +17,7 @@ export function About() {
             I&apos;m Nirupam Pal, a full-stack developer who likes building things people actually use.
           </p>
           <p data-reveal="rise" className="text-mute leading-relaxed">
-            I studied Computer Science at ICFAI University Tripura (B.Sc., 2026, GPA 8.5/10). Since then my work has moved
+            I studied Computer Science at ICFAI University Tripura (B.Tech, 2026, GPA 8.5/10). Since then my work has moved
             between code and people: shipping a Leave and Attendance module as a software developer intern, managing
             marketing projects for clients, and building a blood donation platform that won first prize at a hackathon.
           </p>
