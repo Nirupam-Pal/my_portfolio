@@ -40,9 +40,18 @@ export function Navigation() {
     return () => observer.disconnect();
   }, [isHome]);
 
-  // The scrim only appears once there is content to pass beneath the nav.
+  // Leaving the top, the nav docks: the scrim comes in, the name falls away letter by letter, the logo redraws inside a
+  // turning frame, a light passes along the pill and its items settle one after another. At the top it all comes back.
   useEffect(() => {
-    const onScroll = () => headerRef.current?.setAttribute("data-scrolled", String(window.scrollY > 48));
+    const onScroll = () => {
+      const header = headerRef.current;
+      if (!header) return;
+      const scrolled = String(window.scrollY > 48);
+      const was = header.getAttribute("data-scrolled");
+      // Undocking only animates after a dock has happened, never on arrival.
+      if (was && was !== scrolled) header.setAttribute("data-nav-moved", "");
+      header.setAttribute("data-scrolled", scrolled);
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -100,21 +109,32 @@ export function Navigation() {
             <TransitionLink
               href={isHome ? "#home" : "/"}
               aria-label="Nirupam Pal, back to the top"
-              className="font-display flex h-11 items-center gap-3 text-[0.95rem] font-medium tracking-[-0.01em]"
+              className="font-display flex h-11 items-center text-[0.95rem] font-medium tracking-[-0.01em]"
             >
-              <span aria-hidden="true" className="border-line-strong flex h-9 w-9 items-center justify-center border text-[0.8rem]">
-                NP
+              {/* The site's tab icon, drawn inline so its N can write itself in. */}
+              <span aria-hidden="true" className="nav-mark relative flex h-9 w-9 items-center justify-center">
+                <svg viewBox="0 0 32 32" className="h-full w-full">
+                  <rect width="32" height="32" fill="#08090D" />
+                  <path className="nav-logo-n" d="M8 25V7l16 18V7" fill="none" stroke="#F5F5F7" strokeWidth="2.4" pathLength={1} />
+                  <path className="nav-logo-line" d="M4 28h24" stroke="#8B5CF6" strokeWidth="1.6" />
+                </svg>
               </span>
-              <span className="hidden sm:inline">Nirupam Pal</span>
+              <span aria-hidden="true" className="nav-wordmark hidden pl-3 sm:inline-flex">
+                {[..."Nirupam Pal"].map((ch, i) => (
+                  <span key={i} className="nav-letter" style={{ "--i": i } as React.CSSProperties}>
+                    {ch === " " ? "\u00a0" : ch}
+                  </span>
+                ))}
+              </span>
             </TransitionLink>
           </Magnetic>
 
           <nav aria-label="Primary" className="pointer-events-auto relative hidden lg:block">
-            <ul ref={listRef} className="border-line bg-ink-0/70 flex items-center border px-2 backdrop-blur-md">
-              {navItems.map(({ id, label }) => {
+            <ul ref={listRef} className="nav-pill border-line bg-ink-0/70 flex items-center border px-2 backdrop-blur-md">
+              {navItems.map(({ id, label }, i) => {
                 const isActive = isHome && active === id;
                 return (
-                  <li key={id}>
+                  <li key={id} style={{ "--i": i } as React.CSSProperties}>
                     <Magnetic strength={0.18}>
                       <TransitionLink
                         href={hrefFor(id)}
@@ -123,7 +143,11 @@ export function Navigation() {
                           isActive ? "text-paper" : "text-mute hover:text-paper"
                         }`}
                       >
-                        {label}
+                        {/* On hover the label rolls up and a copy rolls in beneath it. */}
+                        <span className="nav-roll">
+                          <span>{label}</span>
+                          <span aria-hidden="true">{label}</span>
+                        </span>
                       </TransitionLink>
                     </Magnetic>
                   </li>
@@ -136,7 +160,7 @@ export function Navigation() {
           <a
             href={profile.resume}
             download={profile.resumeFileName}
-            className="label text-paper pointer-events-auto hidden h-11 items-center lg:flex"
+            className="nav-resume label text-paper pointer-events-auto hidden h-11 items-center lg:flex"
           >
             <span className="text-link">Resume</span>
           </a>
@@ -151,7 +175,7 @@ export function Navigation() {
             aria-expanded={menuOpen}
             aria-controls="mobile-menu"
             aria-label={menuOpen ? "Close menu" : "Open menu"}
-            className="label text-paper border-line bg-ink-0/70 pointer-events-auto z-10 flex h-11 items-center border px-4 backdrop-blur-md lg:hidden"
+            className="nav-toggle label text-paper border-line bg-ink-0/70 pointer-events-auto z-10 flex h-11 items-center border px-4 backdrop-blur-md lg:hidden"
           >
             {menuOpen ? "Close" : "Menu"}
           </button>

@@ -338,6 +338,98 @@ button.model-label-button {
 }
 [data-scrolled="true"] .nav-scrim { opacity: 1; }
 
+/*
+ * The nav has three moments.
+ * Arrival: the logo's N writes itself and its violet rule is drawn, the name rises letter by letter, the pill opens
+ * from its centre and its items drop in one by one, then Resume slides in.
+ * Docking, on the first scroll down: the name falls away letter by letter and folds into the logo, a frame turns a
+ * quarter around the logo while the N writes itself again, a light passes along the pill, and its items settle.
+ * Undocking, back at the top: all of it returns.
+ */
+/* Logo */
+.nav-mark { isolation: isolate; }
+.nav-mark::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  z-index: -1;
+  border: 1px solid transparent;
+  transition: border-color 0.6s, rotate 0.9s var(--ease-expo);
+}
+[data-scrolled="true"] .nav-mark::before { border-color: rgb(56 189 248 / 0.5); rotate: 90deg; }
+.nav-logo-n { stroke-dasharray: 1; stroke-dashoffset: 0; animation: nav-write 1.1s var(--ease-expo) 0.25s both; }
+[data-scrolled="true"] .nav-logo-n { animation: nav-write-again 0.9s var(--ease-expo) 0.1s both; }
+.nav-mark:hover .nav-logo-n,
+a:focus-visible .nav-logo-n { animation: nav-write-hover 0.8s var(--ease-expo) both; }
+.nav-logo-line { transform-box: fill-box; transform-origin: left center; animation: nav-rule 0.9s var(--ease-expo) 0.85s both; }
+[data-scrolled="true"] .nav-logo-line { animation: nav-rule-again 0.7s var(--ease-expo) 0.45s both; }
+@keyframes nav-write { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes nav-write-again { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes nav-write-hover { from { stroke-dashoffset: -1; } to { stroke-dashoffset: 0; } }
+@keyframes nav-rule { from { scale: 0 1; } to { scale: 1 1; } }
+@keyframes nav-rule-again { from { scale: 0 1; } to { scale: 1 1; } }
+
+/* Name: rises in on arrival, falls away on docking, then the space closes behind it. */
+.nav-wordmark {
+  max-width: 10rem;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width 0.7s var(--ease-expo) 0s;
+}
+.nav-letter { display: inline-block; animation: nav-letter-in 0.9s var(--ease-expo) calc(0.45s + var(--i) * 28ms) both; }
+[data-scrolled="true"] .nav-wordmark { max-width: 0; transition-delay: 0.32s; }
+[data-scrolled="true"] .nav-letter { animation: nav-letter-out 0.45s var(--ease-expo) calc(var(--i) * 22ms) both; }
+[data-nav-moved][data-scrolled="false"] .nav-letter { animation: nav-letter-back 0.8s var(--ease-expo) calc(0.2s + var(--i) * 28ms) both; }
+@keyframes nav-letter-in { from { opacity: 0; translate: 0 105%; } to { opacity: 1; translate: 0 0; } }
+@keyframes nav-letter-back { from { opacity: 0; translate: 0 105%; } to { opacity: 1; translate: 0 0; } }
+@keyframes nav-letter-out { to { opacity: 0; translate: 0 -105%; } }
+
+/* Pill: opens from its centre on arrival; firms up and catches a passing light on docking. */
+.nav-pill {
+  position: relative;
+  overflow: hidden;
+  animation: nav-open 1s var(--ease-expo) 0.35s both;
+  transition: background-color 0.6s, border-color 0.6s, box-shadow 0.6s;
+}
+@keyframes nav-open { from { clip-path: inset(0 50% 0 50%); } to { clip-path: inset(0 0 0 0); } }
+.nav-pill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgb(125 211 252 / 0.16) 50%, transparent 70%);
+  translate: -100% 0;
+}
+[data-scrolled="true"] .nav-pill {
+  background-color: rgb(8 9 13 / 0.88);
+  border-color: var(--color-line-strong);
+  box-shadow: 0 18px 40px -24px rgb(0 0 0 / 0.9);
+}
+[data-scrolled="true"] .nav-pill::after { animation: nav-sheen 1.1s var(--ease-expo) 0.1s both; }
+@keyframes nav-sheen { from { translate: -100% 0; } to { translate: 100% 0; } }
+.nav-pill > li { animation: nav-drop 0.8s var(--ease-expo) calc(0.55s + var(--i) * 55ms) both; }
+[data-scrolled="true"] .nav-pill > li { animation: nav-settle 0.7s var(--ease-expo) calc(var(--i) * 45ms) both; }
+[data-nav-moved][data-scrolled="false"] .nav-pill > li { animation: nav-lift 0.7s var(--ease-expo) calc(var(--i) * 45ms) both; }
+@keyframes nav-drop { from { opacity: 0; translate: 0 -0.75rem; } to { opacity: 1; translate: 0 0; } }
+@keyframes nav-settle { from { opacity: 0.25; translate: 0 -0.5rem; } to { opacity: 1; translate: 0 0; } }
+@keyframes nav-lift { from { opacity: 0.25; translate: 0 0.5rem; } to { opacity: 1; translate: 0 0; } }
+
+/* Item labels roll on hover: the label leaves upward and its copy comes up from below. */
+.nav-roll { position: relative; display: block; overflow: hidden; }
+.nav-roll > span { display: block; transition: translate 0.5s var(--ease-expo); }
+.nav-roll > span + span { position: absolute; inset: 0; translate: 0 110%; }
+a:hover > .nav-roll > span,
+a:focus-visible > .nav-roll > span { translate: 0 -110%; }
+a:hover > .nav-roll > span + span,
+a:focus-visible > .nav-roll > span + span { translate: 0 0; }
+
+/* Resume and the phone's menu button arrive last. */
+.nav-resume { animation: nav-side 0.9s var(--ease-expo) 0.9s both; }
+.nav-toggle { animation: nav-side 0.9s var(--ease-expo) 0.5s both; }
+@keyframes nav-side { from { opacity: 0; translate: 0.75rem 0; } to { opacity: 1; translate: 0 0; } }
+[data-scrolled="true"] .nav-resume .text-link { animation: nav-underline 0.9s var(--ease-expo) 0.35s both; }
+@keyframes nav-underline { from { background-size: 0 1px; } to { background-size: 100% 1px; } }
+
 .nav-indicator {
   width: 1px;
   opacity: 0;
@@ -891,6 +983,20 @@ details[open] .details-mark {
   .nav-indicator {
     transition: none;
   }
+  .nav-wordmark,
+  .nav-pill,
+  .nav-mark::before,
+  .nav-roll > span { transition: none !important; }
+  .nav-pill,
+  .nav-pill > li,
+  .nav-pill::after,
+  .nav-letter,
+  .nav-logo-n,
+  .nav-logo-line,
+  .nav-resume,
+  .nav-toggle,
+  .nav-resume .text-link { animation: none !important; }
+  [data-scrolled="true"] .nav-mark::before { rotate: none; }
 }
 
 @media print {
