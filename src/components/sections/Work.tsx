@@ -13,7 +13,7 @@ import { ModelSteps, StepHost } from "./ModelSteps";
 import { ProjectLegend } from "./ProjectLegend";
 import { WorkExhibition } from "./WorkExhibition";
 
-/** One design system, three compositions: each project is staged the way that product behaves. */
+/** Copy on the left and the model on the right for every project; the type follows each product's character. */
 const LAYOUT = {
   flagship: {
     copy: "lg:col-span-6 xl:col-span-5",
@@ -23,16 +23,6 @@ const LAYOUT = {
     scrim: "linear-gradient(90deg, transparent 0, rgb(8 9 13 / 0.86) 9%, rgb(8 9 13 / 0.7) 44%, transparent 68%)",
     meta: "lg:right-0 lg:text-right",
     steps: "lg:top-[24%] lg:right-0 lg:items-end",
-  },
-  // A network of people reads across: profile capture first, then the person's words.
-  mirror: {
-    copy: "lg:col-span-5 lg:col-start-8 lg:row-start-1",
-    stage: "lg:col-span-7 lg:col-start-1 lg:row-start-1",
-    capture: "lg:left-0 lg:bottom-[5%] lg:w-[50%]",
-    title: "display text-[length:var(--fs-title)]",
-    scrim: "linear-gradient(270deg, transparent 0, rgb(8 9 13 / 0.86) 6%, rgb(8 9 13 / 0.7) 40%, transparent 62%)",
-    meta: "lg:left-0",
-    steps: "lg:top-[10%] lg:left-0",
   },
   // Travel is editorial: lighter type in sentence case, led by the photographs.
   editorial: {
@@ -48,7 +38,7 @@ const LAYOUT = {
 
 function Captures({ project }: { project: Project }) {
   if (project.captures.length > 1) {
-    // Wanderlust: real listing photographs. Each one lights up with its card on the map in the model.
+    // Wanderlust: real listing photographs. Each one lights up with its house in the model.
     return (
       <StepHost form={project.id} className="pointer-events-none grid grid-cols-3 gap-2 lg:absolute lg:right-0 lg:bottom-[5%] lg:w-[62%]">
         {project.captures.map((capture, i) => (

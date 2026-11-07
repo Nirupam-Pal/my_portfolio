@@ -10,9 +10,9 @@ import { StepHost } from "./ModelSteps";
 /** Client websites, all live. The model beside them is the same laptop serving each site; hovering a card lights its window. */
 export function Freelance() {
   return (
-    <section id="freelance" data-pose="freelance" aria-labelledby="freelance-title" className="z-content relative px-(--gutter) py-32 lg:py-40">
+    <section id="freelance" data-pose="freelance" data-nav-parent="experience" aria-labelledby="freelance-title" className="z-content relative px-(--gutter) py-32 lg:py-40">
       <div className="freelance-column lg:max-w-[62%]">
-        <SectionLabel index="03" title="Client Projects" className="mb-8" />
+        <SectionLabel index="03" title="Experience / Client Projects" className="mb-8" />
         <h2 id="freelance-title" data-reveal="chars" className="display text-[clamp(3rem,6.4vw,7.25rem)]">
           <Split text={"Freelance\nWork."} />
         </h2>

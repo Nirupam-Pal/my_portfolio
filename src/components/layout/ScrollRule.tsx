@@ -9,14 +9,14 @@ const SECTIONS: Record<string, string> = {
   home: "00 Home",
   about: "01 Ecosystem",
   work: "02 Selected Work",
+  experience: "03 The Journey",
   freelance: "03 Freelance",
   testimonials: "04 Testimonials",
-  experience: "05 The Journey",
-  skills: "06 Toolkit",
-  ai: "07 AI & ML",
-  achievements: "08 Milestones",
-  education: "09 Education",
-  contact: "10 Let's Talk",
+  skills: "05 Toolkit",
+  ai: "06 AI & ML",
+  achievements: "07 Milestones",
+  education: "08 Education",
+  contact: "09 Let's Talk",
 };
 
 /** The scroll indicator, drawn as a measured line, plus a small block naming the current section. */

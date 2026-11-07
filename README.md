@@ -12,10 +12,10 @@ Every object is a system and every connection is information. A single pool of m
 | About | The same application pulled apart into Frontend, APIs & Authentication, Backend and Database, with Problem Solving & System Design as a decision tree beside it |
 | BloodLink | A real-time network acting out the request flow: search by location, send a request, donor accepts, chat opens |
 | ProLink | A social graph acting out the features: publish a post, likes and comments, connect with a user |
-| Wanderlust | A map with the three real listings floating over their pins |
+| Wanderlust | Three houses built from the three listing photos, each lighting with its picture |
+| Experience | A branching commit graph that draws itself as the timeline is read. A way of picturing a career, not a real repository |
 | Freelance | The laptop again, with a window for each of the four client sites. Hovering a card lights its window |
 | Testimonials | The same network, far back and quiet behind the quotes |
-| Experience | A branching commit graph that draws itself as the timeline is read. A way of picturing a career, not a real repository |
 | Skills | A graph of six clusters. Hovering a technology lights it, what it connects to and its category |
 | AI & ML | The Neural Intelligence Lab: input, hidden and output layers that assemble, connect and carry signals. Presented as areas of exploration |
 | Achievements | BloodLink's network twice: inside an award ring for the prize, broadcasting outward for the presentation |

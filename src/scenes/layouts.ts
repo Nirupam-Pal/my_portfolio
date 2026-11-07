@@ -165,16 +165,15 @@ export const avatarOf = (card: { c: V3; w: number; h: number }): V3 => [
   card.c[2],
 ];
 
-/* ---------------------------------------- Wanderlust: the listings in the screenshots, on a map */
-export const MAP = { y: -1.45, x: 4.6, nearZ: 2.4, farZ: -6.4, search: [-0.6, 2.3, -3.2] as V3 } as const;
-export const listings: readonly { id: string; label: string; x: number; z: number; lift: number }[] = [
-  { id: "lake", label: "Lakeside house", x: -1.3, z: 0.7, lift: 2.0 },
-  { id: "cabin", label: "Timber cabin", x: 0.75, z: -1.4, lift: 2.75 },
-  { id: "villa", label: "Villa and pool", x: 2.75, z: 0.1, lift: 2.15 },
+/* ---------------------------------------- Wanderlust: the listings in the screenshots */
+export const terrain = (x: number, z: number) => -1.25 + 0.28 * Math.sin(x * 0.5 + z * 0.22) + 0.18 * Math.cos(z * 0.4);
+export const lane = (z: number) => Math.sin(z * 0.28) * 1.15;
+export const listings: readonly { id: string; label: string; x: number; z: number; top: number }[] = [
+  { id: "lake", label: "Lakeside house", x: -2.2, z: -0.2, top: 1.05 },
+  { id: "cabin", label: "Timber cabin", x: -0.9, z: -2.6, top: 1.55 },
+  { id: "villa", label: "Villa and pool", x: 0.4, z: -5, top: 1.3 },
 ];
-export const pinAt = (l: (typeof listings)[number]): V3 => [l.x, MAP.y, l.z];
-export const cardAt = (l: (typeof listings)[number]): V3 => [l.x, MAP.y + l.lift, l.z];
-export const CARD = { w: 0.86, h: 0.62 } as const;
+export const listingAt = (l: (typeof listings)[number]): V3 => [l.x, terrain(l.x, l.z), l.z];
 
 /* ---------------------------------------- Freelance: the laptop, and the sites that went live from it */
 export const CLIENT_SITES: readonly V3[] = [
@@ -313,16 +312,13 @@ export const LABEL_SETS: readonly { poses: readonly PoseId[]; labels: readonly M
     labels: [
       { id: "post", text: "Post", at: lifted(PRO.post.c, PRO.post.h + 0.16), tag: 0 },
       { id: "likes", text: "Likes", at: PRO.like, tag: 1, whenLit: true },
-      { id: "comments", text: "Comments", at: [PRO.comments[1].c[0] + PRO.comments[1].w, PRO.comments[1].c[1], PRO.comments[1].c[2]], tag: 1, whenLit: true },
+      { id: "comments", text: "Comments", at: [PRO.comments[1].c[0] - PRO.comments[1].w, PRO.comments[1].c[1], PRO.comments[1].c[2]], align: "end", tag: 1, whenLit: true },
       { id: "connection", text: "New connection", at: [0.2, 2.2, 0.2], tag: 2, whenLit: true },
     ],
   },
   {
     poses: ["wanderlust"],
-    labels: [
-      ...listings.map((l, i) => ({ id: l.id, text: l.label, at: lifted(cardAt(l), CARD.h + 0.14), tag: i })),
-      { id: "search", text: "Search results", at: lifted(MAP.search, 0.42), align: "end" as const },
-    ],
+    labels: listings.map((l, i) => ({ id: l.id, text: l.label, at: lifted(listingAt(l), l.top), tag: i })),
   },
   {
     poses: ["freelance"],

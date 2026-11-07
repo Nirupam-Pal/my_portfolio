@@ -11,7 +11,7 @@ export function Experience() {
       className="z-content relative min-h-svh px-(--gutter) pt-36 pb-32"
     >
       <div data-pose="experience">
-        <SectionLabel index="05" title="Version History" className="mb-8" />
+        <SectionLabel index="03" title="Version History" className="mb-8" />
         <h2 id="experience-title" data-reveal="chars" className="display heading-section">
           <Split text={"The\nJourney."} />
         </h2>

@@ -35,13 +35,13 @@ export default function HomePage() {
         <Work />
       </Deferred>
       <Deferred>
+        <Experience />
+      </Deferred>
+      <Deferred>
         <Freelance />
       </Deferred>
       <Deferred>
         <Testimonials />
-      </Deferred>
-      <Deferred>
-        <Experience />
       </Deferred>
       <Deferred>
         <Skills />

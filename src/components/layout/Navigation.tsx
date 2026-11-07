@@ -13,7 +13,7 @@ const MobileMenu = dynamic(() => import("./MobileMenu"), { ssr: false });
 export function Navigation() {
   const pathname = usePathname();
   const isHome = pathname === "/";
-  const [active, setActive] = useState<NavId | null>("home");
+  const [active, setActive] = useState<NavId | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuRequested, setMenuRequested] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
@@ -29,8 +29,9 @@ export function Navigation() {
       (entries) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
-          // Sections without a nav entry clear the indicator rather than leave it on the wrong item.
-          setActive(ids.has(entry.target.id) ? (entry.target.id as NavId) : null);
+          // A section can belong to another's nav entry; the rest without one clear the indicator rather than leave it on the wrong item.
+          const id = (entry.target as HTMLElement).dataset.navParent ?? entry.target.id;
+          setActive(ids.has(id) ? (id as NavId) : null);
         });
       },
       { rootMargin: "-50% 0px -50% 0px" },
@@ -91,7 +92,7 @@ export function Navigation() {
               <span aria-hidden="true" className="border-line-strong flex h-9 w-9 items-center justify-center border text-[0.8rem]">
                 NP
               </span>
-              <span className="hidden sm:inline lg:hidden xl:inline">Nirupam Pal</span>
+              <span className="hidden sm:inline">Nirupam Pal</span>
             </TransitionLink>
           </Magnetic>
 

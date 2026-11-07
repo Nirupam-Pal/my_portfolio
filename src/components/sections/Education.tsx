@@ -11,7 +11,7 @@ export function Education() {
     >
       {/* Long enough for the graph to resolve and be read before the last section begins. */}
       <div className="flex min-h-svh flex-col justify-center py-32 lg:sticky lg:top-0 lg:h-svh lg:py-0">
-      <SectionLabel index="09" title="Knowledge Graph" className="mb-8" />
+      <SectionLabel index="08" title="Knowledge Graph" className="mb-8" />
       <h2 id="education-title" data-reveal="rise" className="font-display mb-12 text-[clamp(1.75rem,3vw,3rem)] font-medium tracking-[-0.025em]">
         Education
       </h2>

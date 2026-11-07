@@ -12,14 +12,11 @@ export const profile = {
 } as const;
 
 export const navItems = [
-  { id: "home", label: "Home" },
   { id: "about", label: "About" },
   { id: "work", label: "Work" },
-  { id: "freelance", label: "Freelance" },
-  { id: "testimonials", label: "Testimonials" },
   { id: "experience", label: "Experience" },
+  { id: "testimonials", label: "Testimonials" },
   { id: "skills", label: "Skills" },
-  { id: "ai", label: "AI & ML" },
   { id: "contact", label: "Contact" },
 ] as const;
 

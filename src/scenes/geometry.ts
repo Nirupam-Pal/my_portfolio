@@ -11,10 +11,8 @@ import {
   avatarOf,
   BLOOD,
   bloodFrame,
-  CARD,
   CLIENT_SITES,
   CLIENT_WINDOW,
-  cardAt,
   clusterLayout,
   CONVERGE,
   CORE,
@@ -23,13 +21,13 @@ import {
   KNOWLEDGE,
   layerTech,
   layerX,
+  lane,
+  listingAt,
   listings,
-  MAP,
   MILESTONE,
   miniNetwork,
   neuralRing,
   neurons,
-  pinAt,
   PRO,
   skillLayout,
   skillLinkTag,
@@ -37,6 +35,7 @@ import {
   synapseTag,
   type V3,
   LAPTOP,
+  terrain,
 } from "./layouts";
 
 export const COUNT = { beams: 480, paths: 170, panels: 44, nodes: 96 } as const;
@@ -737,79 +736,107 @@ function buildProLink(): Form {
 }
 
 /**
- * Wanderlust: the listings as data on a map. Each real listing floats as a card above its pin, and a search panel
- * reaches down to them. Tags are the listings. The smaller cards stand in for the rest of the listings page.
+ * Wanderlust: three houses built from the three real listing photographs, each lighting with its picture. Tags are the
+ * listings. The quieter houses further down the lane stand in for the rest of the listings page.
  */
 function buildWanderlust(): Form {
-  const b = new FormBuilder(71, { min: [-5, -1.5, -7], max: [5, 3, 3] });
-  const { y, x: mapX, nearZ, farZ } = MAP;
-
-  // The map: a fine grid, with a couple of routes drawn across it.
-  for (let i = 0; i <= 12; i++) {
-    const gx = -mapX + (i / 12) * mapX * 2;
-    b.beam([gx, y, nearZ], [gx, y, farZ], i % 3 === 0 ? 0.008 : 0.004, 0);
+  const b = new FormBuilder(71, { min: [-5, -1.5, -14], max: [5, 2, 3] });
+  const lanePts: V3[] = [];
+  for (let i = 0; i <= 34; i++) {
+    const z = 3 - (i / 34) * 17;
+    const x = lane(z);
+    lanePts.push([x, terrain(x, z) + 0.02, z]);
   }
-  for (let i = 0; i <= 11; i++) {
-    const gz = nearZ + (i / 11) * (farZ - nearZ);
-    b.beam([-mapX, y, gz], [mapX, y, gz], i % 3 === 0 ? 0.008 : 0.004, 0);
-  }
-  const road = (wob: number, k: number): V3[] =>
-    Array.from({ length: 15 }, (_, i) => {
-      const t = i / 14;
-      const gx = -mapX + t * mapX * 2;
-      return [gx, y + 0.015, k + Math.sin(t * 5 + wob) * 0.9 - t * 1.4] as V3;
-    });
-  const r1 = road(0.4, 0.9);
-  const r2 = road(2.3, -2.2);
-  b.polyline(r1, 0.016, 0);
-  b.polyline(r2, 0.012, 0);
-  b.route(r1, 0, 0.03);
-  b.route(r2, 0.5, 0.03);
+  b.route(lanePts, 0, 0.028);
 
-  const card = (c: V3, w: number, h: number, tag: number, glow: number, thick: number) => {
-    b.panel(c, [w, 0, 0], [0, h, 0], 0.05, tag);
-    b.polyline([[c[0] - w, c[1] - h, c[2]], [c[0] + w, c[1] - h, c[2]], [c[0] + w, c[1] + h, c[2]], [c[0] - w, c[1] + h, c[2]]], thick, 0, true, tag);
-    // The photograph, then the title and the nightly price below it.
-    b.panel([c[0], c[1] + h * 0.26, c[2] + 0.01], [w * 0.88, 0, 0], [0, h * 0.58, 0], glow, tag);
-    b.beam([c[0] - w * 0.88, c[1] - h * 0.52, c[2]], [c[0] + w * 0.3, c[1] - h * 0.52, c[2]], thick * 0.9, 0, tag);
-    b.beam([c[0] - w * 0.88, c[1] - h * 0.78, c[2]], [c[0] - w * 0.2, c[1] - h * 0.78, c[2]], thick * 1.4, 0, tag);
+  const gable = (x: number, y: number, z: number, w: number, h: number, roof: number, t: number, tag = -1) => {
+    const pts: V3[] = [
+      [x - w, y, z],
+      [x - w, y + h, z],
+      [x, y + roof, z],
+      [x + w, y + h, z],
+      [x + w, y, z],
+    ];
+    b.polyline(pts, t, 0, true, tag);
+    return pts;
+  };
+  const house = (x: number, y: number, z: number, w: number, d: number, h: number, roof: number, t: number, tag = -1) => {
+    const front = gable(x, y, z + d, w, h, roof, t, tag);
+    const back = gable(x, y, z - d, w, h, roof, t, tag);
+    for (let c = 0; c < 5; c++) b.beam(front[c], back[c], t * 0.7, 0, tag);
   };
 
-  // Each pin has a seat on the map, a stem and the listing's card.
-  listings.forEach((l, tag) => {
-    const pin = pinAt(l);
-    const c = cardAt(l);
-    const under: V3 = [c[0], c[1] - CARD.h, c[2]];
-    b.ring(pin, 0.3, 0.05, 0.05, 8, 0, tag);
-    b.node(plus(pin, [0, 0.03, 0]), 0.16, 1, tag);
-    b.beam(pin, under, 0.02, 0, tag);
-    b.route([pin, along(pin, under, 0.5), under], tag * 0.3, 0.08, tag);
-    card(c, CARD.w, CARD.h, tag, 0.14, 0.024);
-  });
+  // The lakeside house: long and low, on a plinth at the water's edge.
+  {
+    const [x, y, z] = listingAt(listings[0]);
+    house(x, y + 0.12, z, 0.8, 0.42, 0.42, 0.78, 0.016, 0);
+    b.box([x, y + 0.06, z], [1.8, 0.12, 1.0], 0.012, 0, 0);
+    [-0.45, 0, 0.45].forEach((dx) => {
+      b.panel([x + dx, y + 0.34, z + 0.43], [0.15, 0, 0], [0, 0.16, 0], 0.35, 0);
+      b.node([x + dx, y + 0.34, z + 0.45], 0.07, 1, 0);
+    });
+    // The lake, with the house's lights drawn across it.
+    b.panel([x, y + 0.01, z + 1.0], [1.1, 0, 0], [0, 0, 0.42], 0, 0);
+    [-0.45, 0, 0.45].forEach((dx, i) => b.route([[x + dx, y + 0.02, z + 0.6], [x + dx, y + 0.02, z + 1.42]], i * 0.2, 0.05, 0));
+  }
 
-  // The search that found them: a query panel, and results travelling out to each card.
-  const S = MAP.search;
-  b.panel(S, [0.8, 0, 0], [0, 0.26, 0], 0.05);
-  b.polyline([[S[0] - 0.8, S[1] - 0.26, S[2]], [S[0] + 0.8, S[1] - 0.26, S[2]], [S[0] + 0.8, S[1] + 0.26, S[2]], [S[0] - 0.8, S[1] + 0.26, S[2]]], 0.02, 0, true);
-  b.beam([S[0] - 0.64, S[1], S[2]], [S[0] + 0.3, S[1], S[2]], 0.018, 0);
-  b.node([S[0] + 0.58, S[1], S[2]], 0.1, 1);
-  listings.forEach((l, tag) => {
-    const c = cardAt(l);
-    const pts = arc([S[0], S[1] - 0.26, S[2]], [c[0], c[1] + CARD.h, c[2]], 0.12, 6);
-    b.polyline(pts, 0.006, 0, false, tag);
-    b.route(pts, tag * 0.22, 0.04, tag);
-  });
+  // The timber cabin: a steep A-frame, its one tall window lit against the snow.
+  {
+    const [x, y, z] = listingAt(listings[1]);
+    const front = gable(x, y, z + 0.5, 0.62, 0.02, 1.38, 0.018, 1);
+    const back = gable(x, y, z - 0.5, 0.62, 0.02, 1.38, 0.018, 1);
+    for (let c = 0; c < 5; c++) b.beam(front[c], back[c], 0.012, 0, 1);
+    for (let i = 1; i < 5; i++) {
+      const k = i / 5;
+      const yy = y + k * 1.38;
+      const ww = 0.62 * (1 - k);
+      b.beam([x - ww, yy, z + 0.5], [x - ww, yy, z - 0.5], 0.005, 0, 1);
+      b.beam([x + ww, yy, z + 0.5], [x + ww, yy, z - 0.5], 0.005, 0, 1);
+    }
+    b.panel([x, y + 0.42, z + 0.5], [0.2, 0, 0], [0, 0.38, 0], 0.4, 1);
+    b.node([x, y + 0.42, z + 0.53], 0.1, 1, 1);
+    const snow: V3[] = Array.from({ length: 16 }, (_, i) => {
+      const a = (i / 16) * Math.PI * 2;
+      return [x + Math.cos(a) * 1.05, y + 0.01, z + Math.sin(a) * 1.05];
+    });
+    b.polyline(snow, 0.005, 0, true, 1);
+    b.route([...snow, snow[0]], 0, 0.02, 1);
+  }
 
-  // The rest of the listings, further across the map.
-  for (let i = 0; i < 12; i++) {
+  // The villa: flat slabs stacked by the sea, with its infinity pool running off the edge.
+  {
+    const [x, y, z] = listingAt(listings[2]);
+    b.box([x, y + 0.24, z], [1.9, 0.48, 1.0], 0.016, 0, 2);
+    b.box([x - 0.25, y + 0.72, z], [1.1, 0.42, 0.8], 0.014, 0, 2);
+    b.beam([x - 1.15, y + 0.5, z + 0.6], [x + 1.15, y + 0.5, z + 0.6], 0.016, 0, 2);
+    [-0.6, 0, 0.6].forEach((dx) => {
+      b.panel([x + dx, y + 0.24, z + 0.5], [0.24, 0, 0], [0, 0.16, 0], 0.35, 2);
+      b.node([x + dx, y + 0.24, z + 0.52], 0.07, 1, 2);
+    });
+    b.panel([x + 0.1, y + 0.02, z + 1.05], [1.2, 0, 0], [0, 0, 0.3], 0, 2);
+    const rim: V3[] = [
+      [x - 1.1, y + 0.02, z + 0.75],
+      [x + 1.3, y + 0.02, z + 0.75],
+      [x + 1.3, y + 0.02, z + 1.35],
+      [x - 1.1, y + 0.02, z + 1.35],
+    ];
+    b.polyline(rim, 0.008, 0, true, 2);
+    b.route([...rim, rim[0]], 0, 0.06, 2);
+  }
+
+  // The rest of the listings page, receding down the lane.
+  const houses = 14;
+  for (let i = 0; i < houses; i++) {
+    const z = -6.6 - (i / (houses - 1)) * 7.4;
     const side = i % 2 === 0 ? 1 : -1;
-    const gx = side * (0.8 + b.random() * 3.3);
-    const gz = -2.2 - b.random() * 3.8;
-    const lift = 0.55 + b.random() * 0.55;
-    b.ring([gx, y, gz], 0.15, 0.03, 0.03, 6, 0);
-    b.node([gx, y + 0.02, gz], 0.08, 1);
-    b.beam([gx, y, gz], [gx, y + lift - 0.2, gz], 0.011, 0);
-    if (i < 8) card([gx, y + lift, gz], 0.32, 0.2, -1, 0.06, 0.012);
+    const x = lane(z) + side * (1.4 + b.random() * 1.8);
+    const y = terrain(x, z);
+    const w = 0.42 + b.random() * 0.24;
+    const d = 0.5 + b.random() * 0.4;
+    const h = 0.42 + b.random() * 0.36;
+    house(x, y, z, w, d, h, h + 0.26 + b.random() * 0.2, 0.011);
+    if (i < 10) b.panel([x, y + h * 0.5, z + d], [w * 0.26, 0, 0], [0, h * 0.26, 0], 1);
+    b.node([x, y + h * 0.5, z + d + 0.04], 0.05, 1);
   }
   return b.finish("wanderlust");
 }

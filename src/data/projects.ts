@@ -11,7 +11,7 @@ export interface Project {
   id: ProjectId;
   number: string;
   /** Which of the three compositions in the exhibition this project is staged in. */
-  layout: "flagship" | "mirror" | "editorial";
+  layout: "flagship" | "editorial";
   title: string;
   accent: string;
   description: string;
@@ -76,7 +76,7 @@ export const projects: readonly Project[] = [
   },
   {
     id: "prolink",
-    layout: "mirror",
+    layout: "flagship",
     number: "02",
     title: "ProLink",
     accent: "var(--color-periwinkle)",
@@ -144,7 +144,7 @@ export const projects: readonly Project[] = [
     caseStudy: "/work/wanderlust",
     features: ["Property listings", "Custom pricing", "Reviews", "Secure authentication"],
     flow: { title: "Three real listings", steps: ["Lakeside house", "Timber cabin", "Villa and pool"] },
-    conceptNote: "3D form: a conceptual map of these real listings",
+    conceptNote: "3D form: a conceptual model, built from these listing photos",
     captures: [
       {
         src: "/captures/wanderlust-lake.webp",
