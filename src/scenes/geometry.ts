@@ -25,7 +25,6 @@ import {
   listingAt,
   listings,
   MILESTONE,
-  miniNetwork,
   neuralRing,
   neurons,
   PRO,
@@ -36,6 +35,7 @@ import {
   type V3,
   LAPTOP,
   terrain,
+  VOICE_FRAMES,
 } from "./layouts";
 
 export const COUNT = { beams: 480, paths: 170, panels: 44, nodes: 96 } as const;
@@ -989,59 +989,189 @@ function buildNeural(collapse = 1): Form {
 }
 
 /**
- * Achievements: the same small network twice, in gold. On the left an award ring closes around it; on the right it
- * broadcasts outward, because the second achievement is having presented it to an audience.
+ * Achievements: a processor with its layers lifted apart. Package and pins, a die with traces running out to them,
+ * three plates of code each turned a little further than the last, and a small network crowning them. The two
+ * achievements orbit it on tagged threads: code brackets for the hackathon, and an app window sending outward for the
+ * product presented to an audience.
  */
 function buildMilestones(): Form {
-  const b = new FormBuilder(101, { min: [-10, -3, -3], max: [10, 3.5, 3] });
-  const network = (cx: number, group: number, r: number, scale: number) => {
-    const pts = miniNetwork.map(([x, y, z]) => [cx + x * scale, MILESTONE.y + y * scale, z * scale] as V3);
-    pts.forEach((p, i) => {
-      b.node(p, i === 0 ? r * 2 : r, group);
-      if (i > 0) {
-        b.beam(pts[0], p, 0.016, group);
-        b.route([p, pts[0]], i * 0.15, 0.05);
-      }
-    });
-    pts.slice(1).forEach((p, i, rest) => b.beam(p, rest[(i + 1) % rest.length], 0.006, group));
+  const b = new FormBuilder(101, { min: [-6, -3, -3], max: [6, 3.4, 3] });
+  const { bowl, sides, star, technovate: T, policy: P } = MILESTONE;
+  const around = (r: number, y: number, i: number, count: number = sides): V3 => {
+    const a = (i / count) * Math.PI * 2;
+    return [Math.cos(a) * r, y, Math.sin(a) * r];
   };
 
-  // First prize: a machined ring closing around the winning network.
-  const X1 = MILESTONE.left;
-  const Y = MILESTONE.y;
-  network(X1, 0, 0.14, 1);
-  const ringAt = (x: number, r: number, n: number): V3[] =>
-    Array.from({ length: n }, (_, i) => {
-      const a = (i / n) * Math.PI * 2;
-      return [x + Math.cos(a) * r, Y + Math.sin(a) * r, 0] as V3;
-    });
-  const outer = ringAt(X1, 1.92, 24);
-  outer.forEach((p, i) => b.beam(p, outer[(i + 1) % outer.length], 0.11, 0));
-  const fine = ringAt(X1, 2.12, 24);
-  fine.forEach((p, i) => b.beam(p, fine[(i + 1) % fine.length], 0.008, 0));
-  b.route([...fine, fine[0]], 0, 0.03);
-  outer.forEach((p, i) => {
-    if (i % 6 === 0) b.node(p, 0.13, 0);
+  // The plinth: three machined steps, each a solid disc with a bright edge.
+  [[1.5, -2.6, 0.22], [1.15, -2.31, 0.2], [0.8, -2.08, 0.14]].forEach(([r, y, h], step) => {
+    for (let q = 0; q < 6; q++) b.block([0, y, 0], [r * 1.5, h, r * 1.5], (q * Math.PI) / 12);
+    b.ring([0, y + h / 2, 0], r, 0.018, 0.018, 16);
+    if (step === 0) {
+      const edge = Array.from({ length: 17 }, (_, i) => around(r, y + h / 2 + 0.02, i, 16));
+      b.route(edge, 0, 0.06);
+      for (let i = 0; i < 8; i++) b.node(around(r, y + h / 2 + 0.02, i * 2, 16), 0.05);
+    }
   });
 
-  // Presented: the network sending outward in widening arcs, each with listeners along it.
-  const X2 = MILESTONE.right;
-  network(X2, 1, 0.12, 0.82);
-  [1.3, 1.82, 2.34].forEach((r, k) => {
-    [-1, 1].forEach((side) => {
-      const pts: V3[] = Array.from({ length: 11 }, (_, i) => {
-        const a = (i / 10 - 0.5) * 1.5;
-        return [X2 + side * Math.cos(a) * r, Y + Math.sin(a) * r, 0] as V3;
+  // The stem, turned, with a knot halfway up.
+  const stem = [[0.24, -2.0], [0.15, -1.62], [0.32, -1.36], [0.15, -1.1], [0.22, -0.86], [0.5, -0.62]] as const;
+  stem.slice(0, -1).forEach(([r, y], i) => b.beam([0, y, 0], [0, stem[i + 1][1], 0], r + stem[i + 1][0] * 0.6));
+  stem.forEach(([r, y]) => {
+    b.polyline(Array.from({ length: 8 }, (_, i) => around(r + 0.02, y, i, 8)), 0.014, 0, true);
+  });
+
+  // The bowl: glass over a fine frame, heavier at the rim.
+  for (let i = 0; i < sides; i++) {
+    ([[1, 3, 0.1], [3, 5, 0.2]] as const).forEach(([lo, hi, glow]) => {
+      b.quad(around(bowl[lo][0], bowl[lo][1], i), around(bowl[lo][0], bowl[lo][1], i + 1), around(bowl[hi][0], bowl[hi][1], i + 1), around(bowl[hi][0], bowl[hi][1], i), glow);
+    });
+    const line = bowl.map(([r, y]) => around(r, y, i));
+    b.polyline(line, 0.012);
+    if (i % 2 === 0) b.route(line, i * 0.07, 0.07);
+    b.node(around(1.68, 1.54, i), 0.06);
+  }
+  bowl.slice(1, -1).forEach(([r, y]) => b.polyline(Array.from({ length: sides }, (_, i) => around(r, y, i)), 0.012, 0, true));
+  b.ring([0, 1.54, 0], 1.68, 0.07, 0.07, sides);
+  b.route(Array.from({ length: sides + 1 }, (_, i) => around(1.7, 1.6, i)), 0, 0.04);
+
+  // Handles: one smooth sweep each side.
+  const sweep: V3[] = [];
+  const keys = [[1.66, 1.3], [2.34, 1.44], [2.84, 1.12], [2.88, 0.54], [2.42, 0.06], [1.82, -0.12], [1.28, 0.02]];
+  keys.forEach(([x, y], i) => {
+    sweep.push([x, y, 0]);
+    const next = keys[i + 1];
+    if (!next) return;
+    const before = keys[Math.max(i - 1, 0)];
+    const after = keys[Math.min(i + 2, keys.length - 1)];
+    sweep.push([(x + next[0]) / 2 + (x - before[0] + next[0] - after[0]) / 16, (y + next[1]) / 2 + (y - before[1] + next[1] - after[1]) / 16, 0]);
+  });
+  [-1, 1].forEach((side) => {
+    const handle = sweep.map(([x, y, z]): V3 => [x * side, y, z]);
+    b.polyline(handle, 0.075);
+    b.route(handle, side > 0 ? 0.1 : 0.4, 0.05);
+    b.node(handle[0], 0.09);
+    b.node(handle[handle.length - 1], 0.09);
+  });
+
+  // Light rising out of the bowl to the star.
+  b.node([0, 0.7, 0], 0.5, 1);
+  b.route([[0, 0.7, 0], [0, 1.3, 0], [0, star[1] - 0.45, 0]], 0.1, 0.12);
+
+  // The star: solid and glowing, with rays that pulse outward.
+  const point = (i: number, r: number): V3 => {
+    const a = Math.PI / 2 + (i / 10) * Math.PI * 2;
+    return [star[0] + Math.cos(a) * r, star[1] + Math.sin(a) * r, star[2]];
+  };
+  const OUTER = 0.58;
+  const INNER = 0.25;
+  for (let i = 0; i < 5; i++) b.quad(star, point(i * 2 - 1, INNER), point(i * 2, OUTER), point(i * 2 + 1, INNER), 0.9);
+  b.polyline(Array.from({ length: 10 }, (_, i) => point(i, i % 2 ? INNER : OUTER)), 0.03, 0, true);
+  b.node(star, 0.14, 1);
+  for (let i = 0; i < 10; i++) b.path(point(i, OUTER * 1.25), point(i, i % 2 ? OUTER * 1.7 : OUTER * 2.15), i * 0.1);
+
+  // The laurel around it: a stem each side, its leaves in pairs, smaller towards the top.
+  const R = 3.34;
+  const centre = 0.2;
+  [-1, 1].forEach((side) => {
+    const stations = Array.from({ length: 12 }, (_, i) => {
+      const a = (-82 + (i / 11) * 142) * (Math.PI / 180);
+      return { a, p: [side * Math.cos(a) * R, centre + Math.sin(a) * R, -0.7] as V3 };
+    });
+    const line = stations.map((s) => s.p);
+    b.polyline(line, 0.03);
+    b.route(line, side > 0 ? 0 : 0.5, 0.06);
+    stations.forEach(({ a, p }, i) => {
+      const length = 0.6 - i * 0.022;
+      const along: V3 = [-side * Math.sin(a), Math.cos(a), 0];
+      const out: V3 = [side * Math.cos(a), Math.sin(a), 0];
+      [-1, 1].forEach((face) => {
+        const k = face * 0.46;
+        b.beam(p, [p[0] + (along[0] + out[0] * k) * length, p[1] + (along[1] + out[1] * k) * length, p[2]], 0.105);
       });
-      b.polyline(pts, 0.014 - k * 0.002, 1);
-      b.route(pts.slice(0, 6).reverse(), 0.1 + k * 0.2, 0.03);
-      b.route(pts.slice(5), 0.1 + k * 0.2, 0.03);
-      pts.forEach((p, i) => {
-        if (i % 2 === 1) b.node(p, 0.07, 1);
-      });
+      if (i % 2 === 0) b.node([p[0] + out[0] * 0.2, p[1] + out[1] * 0.2, p[2]], 0.07, 1);
     });
   });
+
+  // Sparks in the air around it.
+  for (let i = 0; i < 26; i++) {
+    const a = b.random() * Math.PI * 2;
+    const r = 1.9 + b.random() * 2.2;
+    b.node([Math.cos(a) * r, -1 + b.random() * 4.4, Math.sin(a) * r * 0.5], 0.035 + b.random() * 0.05, b.random() > 0.6 ? 1 : 0);
+  }
+
+  // First prize: a medal with a one between code brackets, on its ribbons. Its thread runs to the trophy's handle.
+  const onT = (x: number, y: number): V3 => [T[0] + x, T[1] + y, T[2]];
+  const rim = (r: number, count: number) => Array.from({ length: count }, (_, i) => onT(Math.cos((i / count) * Math.PI * 2) * r, Math.sin((i / count) * Math.PI * 2) * r));
+  b.polyline(rim(1.02, 22), 0.045, 1, true, 0);
+  b.polyline(rim(0.88, 18), 0.01, 1, true, 0);
+  b.route([...rim(1.02, 22), onT(1.02, 0)], 0, 0.02, 0);
+  [[-0.32, -1.0, -0.58, -1.92], [0.32, -1.0, 0.58, -1.92]].forEach(([x0, y0, x1, y1], i) => {
+    b.beam(onT(x0, y0), onT(x1, y1), 0.24, 1, 0);
+    b.beam(onT(x1, y1), onT(x1 + (i ? -0.1 : 0.1), y1 + 0.16), 0.06, 1, 0);
+  });
+  const curly = (cx: number, dir: number): V3[] =>
+    ([[0.15, 0.46], [0, 0.38], [0, 0.08], [-0.15, 0], [0, -0.08], [0, -0.38], [0.15, -0.46]] as const).map(([x, y]) => onT(cx + dir * x, y));
+  b.polyline(curly(-0.5, 1), 0.04, 1, false, 0);
+  b.polyline(curly(0.5, -1), 0.04, 1, false, 0);
+  b.polyline([onT(-0.13, 0.26), onT(0.02, 0.44), onT(0.02, -0.42)], 0.07, 1, false, 0);
+  b.beam(onT(-0.16, -0.44), onT(0.2, -0.44), 0.06, 1, 0);
+  const threadA: V3[] = [onT(1.02, -0.1), [-3.6, T[1] - 0.1, 0.3], [-2.88, 0.7, 0]];
+  b.polyline(threadA, 0.01, 1, false, 0);
+  b.route(threadA, 0.2, 0.08, 0);
+  b.node(threadA[2], 0.09, 1, 0);
+
+  // Presented: the product itself on a screen, sending outward in widening arcs. Its thread runs to the other handle.
+  interfacePanel(b, P, [0.95, 0, -0.1], [0, 0.64, 0.04], 1, 1, 0);
+  [0.36, 0.66, 0.96].forEach((r, k) => {
+    const pts: V3[] = Array.from({ length: 6 }, (_, i) => {
+      const a = Math.PI / 2 + (i / 5 - 0.5) * 1.3;
+      return [P[0] + Math.cos(a) * r * 1.15, P[1] + 0.56 + Math.sin(a) * r * 0.8, P[2]];
+    });
+    b.polyline(pts, 0.012 - k * 0.002, 1, false, 1);
+    b.route(pts, k * 0.2, 0.02, 1);
+  });
+  const threadB: V3[] = [[P[0] - 0.95, P[1] - 0.2, P[2]], [3.6, P[1] - 0.2, 0.2], [2.88, 0.7, 0]];
+  b.polyline(threadB, 0.01, 1, false, 1);
+  b.route(threadB, 0.55, 0.08, 1);
+  b.node(threadB[2], 0.09, 1, 1);
+
   return b.finish("milestones");
+}
+
+/** Testimonials: three frames with dimensional quote marks, hung on one thread. Tags are the testimonials. */
+function buildVoices(): Form {
+  const b = new FormBuilder(149, { min: [-5, -3.4, -3], max: [5, 3.8, 2] });
+  const hub: V3 = [0.2, 0.1, -2.4];
+  b.node(hub, 0.14, 1);
+  VOICE_FRAMES.forEach(({ c, w, h }, tag) => {
+    const [x, y, z] = c;
+    b.panel(c, [w, 0, 0], [0, h, 0], 0.04, tag);
+    b.polyline([[x - w, y - h, z], [x + w, y - h, z], [x + w, y + h, z], [x - w, y + h, z]], 0.018, 0, true, tag);
+    // Corner ticks standing clear of the frame, as on a measured drawing.
+    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sy]) => {
+      const cx = x + sx * (w + 0.12);
+      const cy = y + sy * (h + 0.12);
+      b.beam([cx, cy, z], [cx - sx * 0.2, cy, z], 0.008, 0, tag);
+      b.beam([cx, cy, z], [cx, cy - sy * 0.2, z], 0.008, 0, tag);
+    });
+    // The quote mark: two slanted blocks standing out from the frame, with depth of their own.
+    [-0.22, 0.2].forEach((dx) => {
+      const qx = x - w * 0.46 + dx;
+      const qy = y + h * 0.2;
+      b.slab([qx + 0.09, qy + 0.24, z + 0.3], [qx - 0.09, qy - 0.2, z + 0.3], 0.13, 0.13, 1, tag);
+      b.node([qx + 0.1, qy + 0.3, z + 0.3], 0.13, 1, tag);
+    });
+    // Lines of text, kept abstract: the words themselves are on the page.
+    [0.28, 0, -0.28, -0.56].forEach((ly, i) => {
+      b.beam([x - w * 0.02, y + ly * h * 1.4, z + 0.02], [x + w * (0.82 - (i % 3) * 0.22), y + ly * h * 1.4, z + 0.02], 0.012, 0, tag);
+    });
+    const end: V3 = [x, y + (y > 0 ? -h : h), z];
+    const thread: V3[] = [hub, [x, hub[1], (hub[2] + z) / 2], end];
+    b.polyline(thread, 0.008, 0, false, tag);
+    b.route(thread, tag * 0.3, 0.05, tag);
+    b.node(end, 0.09, 1, tag);
+  });
+  return b.finish("voices");
 }
 
 /** Education: a graph with two large nodes, the school and then the degree, each surrounded by what it gave. */
@@ -1239,6 +1369,7 @@ export type FormId =
   | "neuralSeed"
   | "neural"
   | "milestones"
+  | "voices"
   | "knowledge"
   | "convergence";
 
@@ -1258,6 +1389,7 @@ export function buildForms(): Record<FormId, Form> {
     neuralSeed: buildNeural(0.28),
     neural: buildNeural(),
     milestones: buildMilestones(),
+    voices: buildVoices(),
     knowledge: buildKnowledge(),
     convergence: buildConvergence(),
   };

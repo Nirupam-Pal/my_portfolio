@@ -15,10 +15,10 @@ Every object is a system and every connection is information. A single pool of m
 | Wanderlust | Three houses built from the three listing photos, each lighting with its picture |
 | Experience | A branching commit graph that draws itself as the timeline is read. A way of picturing a career, not a real repository |
 | Freelance | The laptop again, with a window for each of the four client sites. Hovering a card lights its window |
-| Testimonials | The same network, far back and quiet behind the quotes |
+| Testimonials | Three frames on one thread behind the quotes. The current voice steps forward with its frame |
 | Skills | A graph of six clusters. Hovering a technology lights it, what it connects to and its category |
 | AI & ML | The Neural Intelligence Lab: input, hidden and output layers that assemble, connect and carry signals. Presented as areas of exploration |
-| Achievements | BloodLink's network twice: inside an award ring for the prize, broadcasting outward for the presentation |
+| Achievements | A glowing trophy in a laurel wreath, with a first-prize medal and a presentation screen on threads either side. Hovering one steps it forward |
 | Education | A knowledge graph from 2021 to 2026 |
 | Contact | Technologies, experiences and ideas converging on the laptop from the hero |
 
@@ -42,7 +42,20 @@ npm run dev
 
 Then open http://localhost:3000.
 
-Other scripts: `npm run build`, `npm run start`, `npm run lint`, `npm run typecheck`.
+Other scripts: `npm run build` (writes the finished site to `out/`), `npm run lint`, `npm run typecheck`.
+
+## Deploying to Render
+
+The site builds to plain files, so it deploys as a **Static Site**:
+
+| Setting | Value |
+| --- | --- |
+| Branch | `main` |
+| Build Command | `npm ci --include=dev && npm run build` |
+| Publish Directory | `out` |
+| Environment variables | None needed. If you add a custom domain, set `NEXT_PUBLIC_SITE_URL` to it and redeploy |
+
+`--include=dev` matters: with `NODE_ENV=production`, a plain install skips Tailwind and TypeScript and the build fails.
 
 ## Deploying to Vercel
 

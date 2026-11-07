@@ -39,7 +39,7 @@ export function TransitionLink({ href, transitionLabel = "Nirupam Pal", onClick,
   };
 
   return (
-    <Link href={href} onClick={handleClick} scroll={false} {...rest}>
+    <Link href={href} prefetch={false} onClick={handleClick} scroll={false} {...rest}>
       {children}
     </Link>
   );

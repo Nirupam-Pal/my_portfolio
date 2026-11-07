@@ -3,10 +3,9 @@
  * so DOM labels can be projected onto the same points the forms draw, on the main thread and in the worker alike.
  */
 import { aiLayers } from "@/data/ai";
-import { achievements, education } from "@/data/profile";
+import { education } from "@/data/profile";
 import { experience } from "@/data/experience";
 import { freelanceProjects } from "@/data/freelance";
-import { projects } from "@/data/projects";
 import { clusters, skillLinks, skills } from "@/data/skills";
 import { heroSystems, stackLayers } from "@/data/stack";
 
@@ -202,15 +201,22 @@ export const GIT = {
   ],
 } as const;
 
-/* ---------------------------------------- Achievements: BloodLink's network, recognised twice */
-export const MILESTONE = { left: -9, right: 9, y: 0.1 } as const;
-export const miniNetwork: readonly V3[] = [
-  [0, 0, 0],
-  [0.96, 0.4, 0.32],
-  [-0.84, 0.52, -0.24],
-  [0.6, -0.68, -0.4],
-  [-0.68, -0.6, 0.4],
-  [0.04, 0.92, 0.2],
+/* ---------------------------------------- Achievements: a processor, and what it has done in orbit round it */
+export const MILESTONE = {
+  /** The bowl's outline, as radius and height, from where it meets the stem to the rim. */
+  bowl: [[0.5, -0.62], [0.98, -0.34], [1.32, 0.06], [1.52, 0.56], [1.62, 1.06], [1.68, 1.52]] as const,
+  sides: 14,
+  star: [0, 2.56, 0] as V3,
+  /** First prize is the featured one, so it sits nearer. They hang either side of the trophy, clear of the text below. */
+  technovate: [-5.2, 1.75, 0.7] as V3,
+  policy: [5.2, 1.6, 0.3] as V3,
+} as const;
+
+/* ---------------------------------------- Testimonials: three frames on one thread */
+export const VOICE_FRAMES: readonly { c: V3; w: number; h: number }[] = [
+  { c: [-2.5, 2.35, -1.7], w: 1.2, h: 0.74 },
+  { c: [2.7, 2.2, -2.1], w: 1.15, h: 0.7 },
+  { c: [1.5, -2.5, -1.5], w: 1.25, h: 0.74 },
 ];
 
 /* ---------------------------------------- Education: a graph that grows towards the degree */
@@ -280,7 +286,6 @@ export interface ModelLabelSpec {
 
 const prejest = experience.find((e) => e.id === "prejest")!;
 const thoughtflow = experience.find((e) => e.id === "thoughtflow")!;
-const blood = projects.find((p) => p.id === "bloodlink")!;
 const lifted = (at: V3, by: number): V3 => [at[0], at[1] + by, at[2]];
 
 const AFTER_PREJEST: readonly PoseId[] = ["experience-prejest", "experience-thoughtflow"];
@@ -349,14 +354,6 @@ export const LABEL_SETS: readonly { poses: readonly PoseId[]; labels: readonly M
   {
     poses: AI_LABELS,
     labels: aiLayers.map((layer, l) => ({ id: `layer-${l}`, text: layer.label, at: [LAYER_X[l], -LAYER_RADIUS[l] - 0.45, 0] as V3 })),
-  },
-  {
-    poses: ["achievement-technovate"],
-    labels: [{ id: achievements[0].id, text: `${blood.title}, first prize`, at: [MILESTONE.left - 0.75, MILESTONE.y + 1.32, 0] }],
-  },
-  {
-    poses: ["achievement-policy"],
-    labels: [{ id: achievements[1].id, text: `${blood.title}, presented`, at: [MILESTONE.right - 0.62, MILESTONE.y + 1.1, 0] }],
   },
   {
     poses: ["education"],

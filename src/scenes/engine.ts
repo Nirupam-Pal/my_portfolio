@@ -372,6 +372,9 @@ export class SculptureEngine {
   private cameraPos = new THREE.Vector3();
   private lookTarget = new THREE.Vector3();
   private labelVec = new THREE.Vector3();
+  private advanceForm: Form | null = null;
+  private advanceVec: readonly [number, number, number] = [0, 0, 0];
+  private advanceLevel = new Float32Array(8);
   private pointerX = 0;
   private pointerY = 0;
   private focus = new THREE.Vector3();
@@ -562,6 +565,29 @@ export class SculptureEngine {
     return smoothstep(clamp01((mix * (1 + spread) - seed * spread) / 1));
   }
 
+  /** How far a tagged part of a form has stepped towards the viewer, from 0 to 1. */
+  private advanced(form: Form, tag: number) {
+    return form === this.advanceForm && tag >= 0 && tag < this.advanceLevel.length ? this.advanceLevel[tag] : 0;
+  }
+
+  /** Eases what the current step lights towards the viewer. Says whether anything moved, as that means rewriting the steel. */
+  private updateAdvance(current: ResolvedPose, reduced: boolean, dt: number) {
+    const advance = current.pose.sequence?.advance;
+    if (advance) {
+      this.advanceForm = current.form;
+      this.advanceVec = advance;
+    }
+    let moving = false;
+    for (let tag = 0; tag < this.advanceLevel.length; tag++) {
+      const target = advance && this.litForm === current.pose.form && this.litTags.has(tag) ? 1 : 0;
+      let next = reduced ? target : damp(this.advanceLevel[tag], target, 7, dt);
+      if (Math.abs(next - target) < 0.001) next = target;
+      if (next !== this.advanceLevel[tag]) moving = true;
+      this.advanceLevel[tag] = next;
+    }
+    return moving;
+  }
+
   private writeBeams(a: Form, b: Form, mix: number, assemble: number) {
     const m = this.beamMesh.instanceMatrix.array as Float32Array;
     const scatter = this.forms.scatter.beams;
@@ -579,6 +605,16 @@ export class SculptureEngine {
       let bx = lerp(A[o + 3], B[o + 3], k);
       let by = lerp(A[o + 4], B[o + 4], k);
       let bz = lerp(A[o + 5], B[o + 5], k);
+      const step = lerp(this.advanced(a, a.beamTags[i]), this.advanced(b, b.beamTags[i]), k);
+      if (step > 0) {
+        const [sx, sy, sz] = this.advanceVec;
+        ax += sx * step;
+        ay += sy * step;
+        az += sz * step;
+        bx += sx * step;
+        by += sy * step;
+        bz += sz * step;
+      }
       // Parts thin to drawn lines while travelling, so a morph reads as a sketch, never as rubble. Only between forms:
       // moving the camera around one form leaves it solid.
       const thin = a === b ? 1 : 1 - 0.68 * bump(k);
@@ -663,14 +699,16 @@ export class SculptureEngine {
     for (let i = 0; i < COUNT.paths; i++) {
       const o = i * STRIDE.paths;
       const k = this.staggered(mix, this.pathSeeds[i], 0.3);
-      const ax = lerp(A[o], B[o], k);
-      const ay = lerp(A[o + 1], B[o + 1], k);
-      const az = lerp(A[o + 2], B[o + 2], k);
+      const step = lerp(this.advanced(a, a.pathTags[i]), this.advanced(b, b.pathTags[i]), k);
+      const [sx, sy, sz] = this.advanceVec;
+      const ax = lerp(A[o], B[o], k) + sx * step;
+      const ay = lerp(A[o + 1], B[o + 1], k) + sy * step;
+      const az = lerp(A[o + 2], B[o + 2], k) + sz * step;
       // During the entrance each connection draws itself outward, once the modules it joins are there.
       const grow = assemble < 1 ? smoothstep(clamp01((assemble - 0.42 - this.pathDock[i] * 0.36) / 0.14)) : 1;
-      const bx = lerp(ax, lerp(A[o + 3], B[o + 3], k), grow);
-      const by = lerp(ay, lerp(A[o + 4], B[o + 4], k), grow);
-      const bz = lerp(az, lerp(A[o + 5], B[o + 5], k), grow);
+      const bx = lerp(ax, lerp(A[o + 3], B[o + 3], k) + sx * step, grow);
+      const by = lerp(ay, lerp(A[o + 4], B[o + 4], k) + sy * step, grow);
+      const bz = lerp(az, lerp(A[o + 5], B[o + 5], k) + sz * step, grow);
       let dx = bx - ax;
       let dy = by - ay;
       let dz = bz - az;
@@ -736,9 +774,10 @@ export class SculptureEngine {
       const arrive = smoothstep(clamp01((assemble - 0.2 - this.panelDock[i] * 0.42) / 0.26));
       const o = i * STRIDE.panels;
       const k = this.staggered(mix, this.panelSeeds[i], 0.4);
-      const cx = lerp(A[o], B[o], k);
-      const cy = lerp(A[o + 1], B[o + 1], k);
-      const cz = lerp(A[o + 2], B[o + 2], k);
+      const step = lerp(this.advanced(a, a.panelTags[i]), this.advanced(b, b.panelTags[i]), k);
+      const cx = lerp(A[o], B[o], k) + this.advanceVec[0] * step;
+      const cy = lerp(A[o + 1], B[o + 1], k) + this.advanceVec[1] * step;
+      const cz = lerp(A[o + 2], B[o + 2], k) + this.advanceVec[2] * step;
       const tag = current.form.panelTags[i];
       const sequence = this.litForm === current.pose.form ? current.pose.sequence : undefined;
       const on = tag >= 0 && sequence && this.litTags.has(tag) ? 1 : 0;
@@ -796,9 +835,10 @@ export class SculptureEngine {
       m[j + 5] = r;
       m[j + 10] = r;
       m[j + 15] = 1;
-      m[j + 12] = lerp(A[o], B[o], k);
-      m[j + 13] = lerp(A[o + 1], B[o + 1], k);
-      m[j + 14] = lerp(A[o + 2], B[o + 2], k);
+      const step = lerp(this.advanced(pa.form, pa.form.nodeTags[i]), this.advanced(pb.form, pb.form.nodeTags[i]), k);
+      m[j + 12] = lerp(A[o], B[o], k) + this.advanceVec[0] * step;
+      m[j + 13] = lerp(A[o + 1], B[o + 1], k) + this.advanceVec[1] * step;
+      m[j + 14] = lerp(A[o + 2], B[o + 2], k) + this.advanceVec[2] * step;
 
       const ca = pa.nodes[GA[i] % pa.nodes.length] ?? white;
       const cb = pb.nodes[GB[i] % pb.nodes.length] ?? white;
@@ -905,8 +945,9 @@ export class SculptureEngine {
         this.group.updateMatrixWorld();
         projected = true;
       }
-      for (const { el, at } of layer.items.values()) {
-        const v = this.labelVec.set(at[0], at[1], at[2]);
+      for (const { el, at, tag } of layer.items.values()) {
+        const step = tag !== undefined && tag >= 0 && tag < this.advanceLevel.length ? this.advanceLevel[tag] : 0;
+        const v = this.labelVec.set(at[0] + this.advanceVec[0] * step, at[1] + this.advanceVec[1] * step, at[2] + this.advanceVec[2] * step);
         v.applyMatrix4(this.group.matrixWorld).project(camera);
         const x = (v.x * 0.5 + 0.5) * width;
         const y = (-v.y * 0.5 + 0.5) * height;
@@ -946,7 +987,8 @@ export class SculptureEngine {
 
     const last = this.lastState;
     // Moving the steel is the expensive write. A change of light alone leaves it where it is.
-    const moved = last.a !== store.poseA || last.b !== store.poseB || last.mix !== mix || last.assemble !== assemble;
+    const advancing = this.updateAdvance(mix < 0.5 ? pa : pb, reduced, dt);
+    const moved = advancing || last.a !== store.poseA || last.b !== store.poseB || last.mix !== mix || last.assemble !== assemble;
     const changed =
       moved ||
       last.hover !== store.hoverGroups ||

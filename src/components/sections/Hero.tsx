@@ -35,6 +35,28 @@ function SystemDrawing() {
   );
 }
 
+/** What is being learned, kept apart from the job title above it. Leads to the section that says more. */
+function ExploringBadge() {
+  const links = ["M3 3L10 7", "M3 8L10 7", "M3 13L10 7", "M3 3L10 12", "M3 13L10 12", "M10 7L17 8", "M10 12L17 8"];
+  const nodes = [[3, 3], [3, 8], [3, 13], [10, 7], [10, 12], [17, 8]];
+  return (
+    <TransitionLink href="#ai" className="exploring" aria-label="Exploring AI and ML: learning, experimenting and building. Go to the AI and ML section">
+      <svg aria-hidden="true" viewBox="0 0 20 16" className="exploring-net" fill="none">
+        {links.map((d, i) => (
+          <path key={d} d={d} style={{ "--i": i } as React.CSSProperties} />
+        ))}
+        {nodes.map(([cx, cy]) => (
+          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.25" />
+        ))}
+      </svg>
+      <span>Exploring AI &amp; ML</span>
+      <span className="exploring-more">
+        <span>Learning, experimenting &amp; building.</span>
+      </span>
+    </TransitionLink>
+  );
+}
+
 export function Hero() {
   return (
     <section id="home" data-hero aria-labelledby="hero-title" className="relative h-[165svh]">
@@ -44,7 +66,7 @@ export function Hero() {
 
       {/* The name is set clear of the sculpture, which sits to the right of it and below its first line. */}
       <div className="z-hero-name sticky top-0 h-svh overflow-hidden">
-        <div data-hero-name className="absolute inset-x-0 top-[max(5.75rem,12svh)] px-(--gutter) will-change-transform">
+        <div data-hero-name className="absolute inset-x-0 px-(--gutter) will-change-transform">
           <h1 id="hero-title" className="display hero-name leading-[0.8]">
             <Split text={"Nirupam\nPal."} hero />
           </h1>
@@ -63,15 +85,14 @@ export function Hero() {
               <span aria-hidden="true" className="availability-dot bg-sky h-1.5 w-1.5" />
               Available for opportunities
             </p>
+            <ExploringBadge />
             <HeroModelCaption />
           </div>
           <div className="hero-fade pointer-events-auto max-w-[44rem]" style={{ "--d": "800ms" } as React.CSSProperties}>
             <p className="font-display text-[clamp(1.2rem,1.7vw,1.9rem)] leading-[1.08] font-medium tracking-[-0.025em] uppercase">
-              Full-Stack Developer
-              <br />
-              Building Digital Experiences That Matter.
+              Software Engineer &amp; Creative Developer
             </p>
-            <p className="text-mute mt-3.5 max-w-[46ch] text-[0.95rem] leading-relaxed sm:text-base">{profile.statement}</p>
+            <p className="hero-statement text-mute mt-3.5 max-w-[58ch] text-[0.95rem] leading-relaxed sm:text-base">{profile.statement}</p>
           </div>
           <div className="hero-fade pointer-events-auto mt-6 flex flex-wrap items-center gap-3" style={{ "--d": "950ms" } as React.CSSProperties}>
             <Magnetic>

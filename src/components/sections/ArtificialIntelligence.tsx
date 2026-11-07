@@ -34,7 +34,7 @@ export function ArtificialIntelligence() {
       <div data-pose="ai-calm" className="absolute inset-x-0 top-[80%] h-px" />
 
       <div className="ai-pin px-(--gutter) pt-[46svh] pb-24 lg:sticky lg:top-0 lg:flex lg:h-svh lg:flex-col lg:justify-center lg:pt-16 lg:pb-0">
-        <div className="bg-ink-0/60 -mx-(--gutter) px-(--gutter) py-6 lg:mx-0 lg:max-w-[40rem] lg:bg-transparent lg:px-0 lg:py-0">
+        <div className="bg-ink-0/60 -mx-(--gutter) px-(--gutter) py-6 lg:mx-0 lg:ml-auto lg:w-full lg:max-w-[40rem] lg:bg-transparent lg:px-0 lg:py-0">
           <SectionLabel index="06" title={aiCopy.eyebrow} className="mb-6" />
           <h2 id="ai-title" data-reveal="chars" className="display text-[clamp(3rem,6.4vw,7.25rem)]">
             <Split text={aiCopy.title} />
@@ -54,7 +54,7 @@ export function ArtificialIntelligence() {
             ))}
           </ul>
         </div>
-        <div className="webgl-fallback lg:absolute lg:top-1/2 lg:right-(--gutter) lg:w-[40vw] lg:max-w-xl lg:-translate-y-1/2">
+        <div className="webgl-fallback lg:absolute lg:top-1/2 lg:left-(--gutter) lg:w-[40vw] lg:max-w-xl lg:-translate-y-1/2">
           <NetworkDrawing />
         </div>
       </div>

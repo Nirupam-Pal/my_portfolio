@@ -7,11 +7,11 @@ import { freelanceProjects } from "@/data/freelance";
 
 import { StepHost } from "./ModelSteps";
 
-/** Client websites, all live. The model beside them is the same laptop serving each site; hovering a card lights its window. */
+/** Client websites, all live. The model above them is the same laptop serving each site; hovering a card lights its window. */
 export function Freelance() {
   return (
-    <section id="freelance" data-pose="freelance" data-nav-parent="experience" aria-labelledby="freelance-title" className="z-content relative px-(--gutter) py-32 lg:py-40">
-      <div className="freelance-column lg:max-w-[62%]">
+    <section id="freelance" data-pose="freelance" data-nav-parent="experience" aria-labelledby="freelance-title" className="z-content relative px-(--gutter) py-32 lg:py-28">
+      <div className="freelance-column">
         <SectionLabel index="03" title="Experience / Client Projects" className="mb-8" />
         <h2 id="freelance-title" data-reveal="chars" className="display text-[clamp(3rem,6.4vw,7.25rem)]">
           <Split text={"Freelance\nWork."} />
@@ -20,8 +20,8 @@ export function Freelance() {
           Alongside my own products, I build websites for businesses. Four of them are live: a chess academy, a marketing agency, a solar installer and a logistics company.
         </p>
 
-        <StepHost form="freelance" className="mt-14">
-          <ul className="grid list-none gap-5 p-0 sm:grid-cols-2">
+        <StepHost form="freelance" className="mt-14 lg:mt-12">
+          <ul className="grid list-none gap-5 p-0 sm:grid-cols-2 xl:grid-cols-4">
             {freelanceProjects.map((project) => (
               <li key={project.id} data-step-item data-reveal="rise" className="border-line bg-ink-1 group flex flex-col border">
                 <div className="overflow-hidden">
@@ -30,7 +30,7 @@ export function Freelance() {
                     alt={project.alt}
                     width={1280}
                     height={800}
-                    sizes="(min-width: 1024px) 30vw, (min-width: 640px) 46vw, 90vw"
+                    sizes="(min-width: 1280px) 23vw, (min-width: 640px) 46vw, 90vw"
                     className="h-auto w-full transition-transform duration-500 group-hover:scale-[1.03]"
                   />
                 </div>

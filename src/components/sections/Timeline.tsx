@@ -58,7 +58,7 @@ export function Timeline() {
   }, []);
 
   return (
-    <ol ref={rootRef} className="relative mt-16 max-w-[52rem] list-none p-0 lg:mt-24 lg:ml-[8.33vw]">
+    <ol ref={rootRef} className="relative mt-16 max-w-[52rem] list-none p-0 lg:mt-24 lg:ml-auto lg:w-[54%]">
       <div aria-hidden="true" className="bg-line absolute top-1 bottom-0 left-0 w-px">
         <div ref={fillRef} className="from-violet to-sky h-full origin-top bg-gradient-to-b shadow-[0_0_14px_rgb(56_189_248_/_0.55)]" />
       </div>

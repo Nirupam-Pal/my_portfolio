@@ -106,9 +106,34 @@ html.lenis body {
   color: var(--color-mute);
 }
 
-.hero-name { font-size: var(--fs-hero); }
+/*
+ * The name gives way to the copy below it on a short screen: it is set to whichever is smaller, its usual size or what
+ * is left between the top of the page and the copy. On any screen of ordinary height its usual size is the smaller.
+ */
+.hero-name {
+  --hero-top: 5.75rem;
+  --hero-copy: 28.5rem;
+  --hero-usual: var(--fs-hero);
+  font-size: min(var(--hero-usual), calc((100svh - var(--hero-copy) - max(var(--hero-top), 12svh)) / 1.6));
+}
+[data-hero-name] { top: max(5.75rem, 12svh); }
 @media (min-width: 1024px) {
-  .hero-name { font-size: var(--fs-hero-wide); }
+  .hero-name { --hero-copy: 20rem; --hero-usual: var(--fs-hero-wide); }
+}
+/* Short phones, upright or on their side: the copy closes up so the name can keep its place. */
+@media (max-width: 1023px) and (max-height: 700px) {
+  .hero-name { --hero-top: 4.5rem; --hero-copy: 25rem; }
+  [data-hero-name] { top: max(4.5rem, 12svh); }
+  [data-hero-copy] { padding-bottom: 1rem; }
+  [data-hero-copy] > :first-child { margin-bottom: 0.625rem; row-gap: 0.25rem; }
+  [data-hero-copy] > :last-child { margin-top: 0.875rem; }
+  .hero-statement { margin-top: 0.5rem; font-size: 0.875rem; line-height: 1.45; }
+  .hero-caption { width: auto; }
+  .hero-caption .model-caption { display: none; }
+}
+@media (max-width: 1023px) and (max-height: 480px) {
+  .hero-name { --hero-copy: 13.75rem; }
+  [data-hero-copy] > :nth-child(2), .hero-statement { max-width: none; }
 }
 
 .heading-section {
@@ -499,6 +524,267 @@ details[open] .details-mark {
   padding-block: 6rem;
 }
 
+/* ---------------------------------------- Hero: what is being learned */
+.exploring {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  gap: 0.5rem;
+  padding: 0.25rem 0.625rem 0.25rem 0.5rem;
+  border: 1px solid var(--color-line);
+  background: rgb(8 9 13 / 0.6);
+  color: var(--color-paper);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: border-color 0.35s;
+}
+.exploring:hover,
+.exploring:focus-visible { border-color: var(--color-line-strong); }
+.exploring-net {
+  width: 1.25rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+.exploring-net path {
+  stroke: rgb(165 180 252 / 0.4);
+  stroke-width: 0.6;
+  stroke-dasharray: 3 12;
+  animation: exploring-signal 3.2s linear infinite;
+  animation-delay: calc(var(--i) * -0.45s);
+}
+.exploring-net circle { fill: var(--color-sky); }
+@keyframes exploring-signal {
+  to { stroke-dashoffset: -15; }
+}
+/* Opens sideways, so the row beside it moves instead of the whole hero. */
+.exploring-more {
+  display: grid;
+  grid-template-columns: 0fr;
+  color: var(--color-mute);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  transition: grid-template-columns 0.5s var(--ease-expo);
+}
+.exploring-more > span {
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.exploring:hover .exploring-more,
+.exploring:focus-visible .exploring-more { grid-template-columns: 1fr; }
+.exploring:hover .exploring-more > span,
+.exploring:focus-visible .exploring-more > span { opacity: 1; }
+/* What it opens over steps aside rather than landing on the model. */
+.exploring ~ * { transition: opacity 0.3s; }
+.exploring:hover ~ *,
+.exploring:focus-visible ~ * { opacity: 0; }
+
+/* ---------------------------------------- Achievements */
+.no-webgl .achievements { padding-top: 7rem; }
+/* One line, centred, on screens with the width for it. */
+@media (min-width: 1024px) {
+  .heading-oneline .split-line { display: inline-block; }
+  .heading-oneline .split-line + .split-line { margin-left: 0.26em; }
+}
+.milestone-row { transition: opacity 0.4s; }
+[data-step]:not([data-step="none"]) > .milestone-row:not([data-active]) { opacity: 0.55; }
+.milestone-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  gap: 0.375rem;
+  color: var(--color-paper);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: color 0.3s;
+}
+.milestone-link:hover { color: var(--color-gold); }
+.milestone-spot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+}
+.milestone-spot-target {
+  position: absolute;
+  top: -3.75rem;
+  left: -3.75rem;
+  display: block;
+  width: 7.5rem;
+  height: 7.5rem;
+  border-radius: 50%;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.milestone-info {
+  position: absolute;
+  width: 17.5rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--color-line-strong);
+  background: rgb(10 11 16 / 0.94);
+  color: var(--color-paper);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.5rem);
+  transition: opacity 0.3s, transform 0.5s var(--ease-expo);
+}
+.milestone-spot[data-side="start"] > .milestone-info { top: -9.5rem; left: 6.5rem; width: 15rem; }
+.milestone-spot[data-side="end"] > .milestone-info { top: -9.5rem; right: 6.5rem; width: 15rem; }
+/* On a short screen there is no room above the medal under the heading. */
+@media (max-height: 820px) {
+  .milestone-spot > .milestone-info { top: -5rem !important; }
+}
+.milestone-spot[data-lit] > .milestone-info {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------------------------------------- Testimonials: one voice in focus, the others behind it */
+.voices { outline-offset: 0.75rem; }
+.voices-stage {
+  perspective: 1500px;
+  perspective-origin: 50% 40%;
+  touch-action: pan-y;
+  transform-style: preserve-3d;
+}
+.voice {
+  max-width: min(40rem, 100%);
+  width: 100%;
+  justify-self: center;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.voice-face {
+  position: relative;
+  height: 100%;
+  padding: 1.25rem 1.25rem 1.5rem;
+  border: 1px solid var(--color-line);
+  background: rgb(16 18 24 / 0.93);
+  transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transform-style: preserve-3d;
+  transition: transform 0.5s var(--ease-expo), box-shadow 0.6s, border-color 0.6s;
+}
+[data-focus] > .voice-face {
+  border-color: var(--color-line-strong);
+  box-shadow: 0 30px 70px -40px rgb(0 0 0 / 0.9);
+}
+[data-focus] > .voice-face:hover { box-shadow: 0 40px 90px -40px rgb(0 0 0 / 1); }
+/* The edge takes the light from wherever the pointer is. */
+.voice-face::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  padding: 1px;
+  background: radial-gradient(22rem circle at var(--light-x, 50%) var(--light-y, 50%), rgb(165 180 252 / 0.75), transparent 70%);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s;
+}
+.voice-face[data-lit]::before { opacity: 1; }
+.voice-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.62rem;
+}
+.voice-meta-rule {
+  width: 1.75rem;
+  height: 1px;
+  background: var(--color-line-strong);
+}
+/* A mark with depth: three copies set apart, each moving a little more than the one behind it. */
+.voice-quote {
+  position: relative;
+  display: block;
+  width: 1.875rem;
+  height: 1.875rem;
+  margin-top: 1.125rem;
+  color: var(--color-violet);
+  transform-style: preserve-3d;
+}
+.voice-quote > svg {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.6s var(--ease-expo);
+}
+.voice-quote > svg:nth-child(1) {
+  opacity: 0.28;
+  transform: translate3d(calc(var(--shift-x, 0) * -5px + 3px), calc(var(--shift-y, 0) * -5px + 3px), 0);
+}
+.voice-quote > svg:nth-child(2) {
+  opacity: 0.55;
+  transform: translate3d(calc(var(--shift-x, 0) * -2px + 1.5px), calc(var(--shift-y, 0) * -2px + 1.5px), 8px);
+}
+.voice-quote > svg:nth-child(3) {
+  color: var(--color-periwinkle);
+  transform: translate3d(calc(var(--shift-x, 0) * 5px), calc(var(--shift-y, 0) * 5px), 18px);
+}
+.voice-words {
+  margin-top: 1.125rem;
+  transform: translateZ(10px);
+}
+.voice-person > span { transition: color 0.4s, transform 0.5s var(--ease-expo); }
+.voice-face:hover .voice-person > span:first-child { transform: translateX(0.25rem); }
+.voice-face:hover .voice-person > span:last-child {
+  color: var(--color-paper);
+  transform: translateX(0.25rem);
+}
+@media (min-width: 768px) {
+  .voice-face { padding: 1.75rem 2.25rem 2rem; }
+}
+/* The room shifts with the voice: the page's own violet, moved across and barely there. */
+.voices-light {
+  position: absolute;
+  z-index: -1;
+  inset: -24% 0;
+  background: radial-gradient(40% 56% at 50% 50%, rgb(139 92 246 / 0.16), transparent 72%);
+  transform: translateX(calc((var(--active) - 1) * 12%));
+  transition: transform 1.4s var(--ease-expo);
+  pointer-events: none;
+}
+.voice-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--color-line-strong);
+  background: rgb(8 9 13 / 0.7);
+  color: var(--color-paper);
+  transition: background-color 0.3s, color 0.3s;
+}
+.voice-control:hover {
+  background: var(--color-paper);
+  color: var(--color-ink-0);
+}
+.voice-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+}
+.voice-dot > span {
+  display: block;
+  width: 1.75rem;
+  height: 1px;
+  background: var(--color-line-strong);
+  transition: background-color 0.4s, height 0.4s;
+}
+.voice-dot:hover > span { background: var(--color-paper); }
+.voice-dot[aria-current] > span {
+  height: 2px;
+  background: var(--color-sky);
+}
+
 /* ---------------------------------------- Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .js [data-reveal] {
@@ -511,6 +797,14 @@ details[open] .details-mark {
   .scroll-tick {
     animation: none;
   }
+  .exploring-net path { animation: none; stroke-dasharray: none; }
+  .exploring-more,
+  .exploring-more > span,
+  .voice-face,
+  .voice-quote > svg,
+  .voice-person > span,
+  .voices-light,
+  .milestone-info { transition: none; }
   .btn,
   .btn::before,
   .disclosure > div,

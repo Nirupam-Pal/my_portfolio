@@ -1,9 +1,10 @@
 import { profile } from "@/data/profile";
 import { projects } from "@/data/projects";
 
-/** Explicit URL first, then Vercel's production URL, so metadata is correct without configuration. */
+/** Explicit URL first, then the host's own, so metadata is correct without configuration. */
 export const siteUrl = (() => {
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+  if (process.env.RENDER_EXTERNAL_URL) return process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "");
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
   return "http://localhost:3000";
 })();

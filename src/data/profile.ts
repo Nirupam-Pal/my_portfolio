@@ -8,7 +8,7 @@ export const profile = {
   linkedin: "https://www.linkedin.com/in/nirupam-pal-22b959250/",
   github: "https://github.com/Nirupam-Pal",
   location: "Agartala, Tripura",
-  statement: "I build scalable web applications, intuitive digital products, and meaningful technology solutions.",
+  statement: "I build thoughtful digital experiences, solve complex problems through code, and continuously explore new technologies. Currently expanding my skills in Artificial Intelligence and Machine Learning.",
 } as const;
 
 export const navItems = [

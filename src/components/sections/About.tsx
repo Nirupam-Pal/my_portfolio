@@ -8,11 +8,11 @@ export function About() {
   return (
     <section id="about" aria-labelledby="about-title" className="z-content relative px-(--gutter)">
       <div data-pose="about-stack" className="flex min-h-svh flex-col justify-center pt-28 pb-16">
-        <SectionLabel index="01" title="The Person Behind the Code" className="mb-8" />
-        <h2 id="about-title" data-reveal="chars" className="display heading-section">
+        <SectionLabel index="01" title="The Person Behind the Code" className="mb-8 lg:justify-end" />
+        <h2 id="about-title" data-reveal="chars" className="display heading-section lg:text-right">
           <Split text={"Beyond\nThe Code."} />
         </h2>
-        <div className="mt-10 max-w-xl space-y-5 lg:mt-14">
+        <div className="mt-10 max-w-xl space-y-5 lg:mt-14 lg:ml-auto">
           <p data-reveal="rise" className="body-lead">
             I&apos;m Nirupam Pal, a full-stack developer who likes building things people actually use.
           </p>
@@ -36,7 +36,7 @@ export function About() {
             className={`min-h-[118svh] pt-[12svh] ${i === 0 ? "lg:pt-[13svh]" : "lg:pt-[28svh]"}`}
           >
             {/* Each one holds its place while the camera moves across the stack, then the next pushes it out. */}
-            <div className={`bg-ink-0/55 sticky top-[12svh] max-w-[46rem] py-4 backdrop-blur-[2px] lg:bg-transparent lg:py-0 lg:backdrop-blur-none ${i === 0 ? "lg:top-[13svh]" : "lg:top-[28svh]"}`}>
+            <div className={`bg-ink-0/55 sticky top-[12svh] max-w-[46rem] py-4 lg:ml-auto lg:w-[54%] backdrop-blur-[2px] lg:bg-transparent lg:py-0 lg:backdrop-blur-none ${i === 0 ? "lg:top-[13svh]" : "lg:top-[28svh]"}`}>
               <p data-reveal="rise" className="label mb-5 flex items-center gap-3">
                 <span className="text-sky">0{i + 1}</span>
                 <span aria-hidden="true" className="bg-line-strong h-px w-8" />

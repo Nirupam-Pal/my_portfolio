@@ -42,7 +42,7 @@ function HeroLabels() {
 /** Says in words what the sculpture is lighting up, for every screen size. It is what makes the model readable on a phone. */
 export function HeroModelCaption() {
   return (
-    <div className="requires-webgl flex w-full min-w-0 items-start gap-1 sm:w-auto">
+    <div className="hero-caption requires-webgl flex w-full min-w-0 items-start gap-1 sm:w-auto">
       <StepHost form="core" className="model-caption max-w-[38rem] min-w-0 flex-1">
         <p data-idle="" className="text-mute font-mono text-[0.72rem] leading-snug">
           One application, five connected parts.

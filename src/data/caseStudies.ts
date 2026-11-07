@@ -74,7 +74,7 @@ export const caseStudies: Record<ProjectId, CaseStudy> = {
     systems: [
       {
         title: "Access",
-        body: "A NestJS REST API secured with JWT access and refresh tokens, role-based access control across User and Blood Bank roles, and OTP email verification through the Brevo API.",
+        body: "A NestJS REST API secured with JWT access and refresh tokens, role-based access control across User, Blood Bank and Donor roles, and OTP email verification through the Brevo API.",
       },
       {
         title: "Discovery",
