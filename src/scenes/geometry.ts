@@ -158,7 +158,7 @@ class FormBuilder {
   }
 
   /** A panel filling the quad between four corners given in order. */
-  quad(p0: V3, p1: V3, p2: V3, p3: V3, glow = 0) {
+  quad(p0: V3, p1: V3, p2: V3, p3: V3, glow = 0, tag = -1) {
     const c: V3 = [
       (p0[0] + p1[0] + p2[0] + p3[0]) / 4,
       (p0[1] + p1[1] + p2[1] + p3[1]) / 4,
@@ -166,7 +166,7 @@ class FormBuilder {
     ];
     const u: V3 = [(p1[0] - p0[0]) / 2, (p1[1] - p0[1]) / 2, (p1[2] - p0[2]) / 2];
     const v: V3 = [(p3[0] - p0[0]) / 2, (p3[1] - p0[1]) / 2, (p3[2] - p0[2]) / 2];
-    this.panel(c, u, v, glow);
+    this.panel(c, u, v, glow, tag);
   }
 
   node(p: V3, r = 0.05, group = 0, tag = -1) {
@@ -1004,7 +1004,7 @@ function buildMilestones(): Form {
 
   // The plinth: three machined steps, each a solid disc with a bright edge.
   [[1.5, -2.6, 0.22], [1.15, -2.31, 0.2], [0.8, -2.08, 0.14]].forEach(([r, y, h], step) => {
-    for (let q = 0; q < 6; q++) b.block([0, y, 0], [r * 1.5, h, r * 1.5], (q * Math.PI) / 12);
+    for (let q = 0; q < 12; q++) b.block([0, y, 0], [r * 1.38, h, r * 1.38], (q * Math.PI) / 24);
     b.ring([0, y + h / 2, 0], r, 0.018, 0.018, 16);
     if (step === 0) {
       const edge = Array.from({ length: 17 }, (_, i) => around(r, y + h / 2 + 0.02, i, 16));
@@ -1034,23 +1034,20 @@ function buildMilestones(): Form {
   b.ring([0, 1.54, 0], 1.68, 0.07, 0.07, sides);
   b.route(Array.from({ length: sides + 1 }, (_, i) => around(1.7, 1.6, i)), 0, 0.04);
 
-  // Handles: one smooth sweep each side.
-  const sweep: V3[] = [];
-  const keys = [[1.66, 1.3], [2.34, 1.44], [2.84, 1.12], [2.88, 0.54], [2.42, 0.06], [1.82, -0.12], [1.28, 0.02]];
-  keys.forEach(([x, y], i) => {
-    sweep.push([x, y, 0]);
-    const next = keys[i + 1];
-    if (!next) return;
-    const before = keys[Math.max(i - 1, 0)];
-    const after = keys[Math.min(i + 2, keys.length - 1)];
-    sweep.push([(x + next[0]) / 2 + (x - before[0] + next[0] - after[0]) / 16, (y + next[1]) / 2 + (y - before[1] + next[1] - after[1]) / 16, 0]);
-  });
+  // Handles: a pair of angle brackets, so the cup stands between them as code does. A finer line runs inside each.
   [-1, 1].forEach((side) => {
-    const handle = sweep.map(([x, y, z]): V3 => [x * side, y, z]);
-    b.polyline(handle, 0.075);
-    b.route(handle, side > 0 ? 0.1 : 0.4, 0.05);
-    b.node(handle[0], 0.09);
-    b.node(handle[handle.length - 1], 0.09);
+    const bracket = (inset: number): V3[] => [
+      [side * (1.66 - inset * 0.2), 1.34 - inset, 0],
+      [side * (2.78 - inset), 0.6, 0],
+      [side * (1.36 - inset * 0.2), -0.14 + inset, 0],
+    ];
+    const outer = bracket(0);
+    b.polyline(outer, 0.13);
+    b.polyline(bracket(0.3), 0.022);
+    b.route(outer, side > 0 ? 0.1 : 0.4, 0.12);
+    b.node(outer[1], 0.16, 1);
+    b.node(outer[0], 0.08);
+    b.node(outer[2], 0.08);
   });
 
   // Light rising out of the bowl to the star.
@@ -1105,9 +1102,10 @@ function buildMilestones(): Form {
   b.polyline(rim(1.02, 22), 0.045, 1, true, 0);
   b.polyline(rim(0.88, 18), 0.01, 1, true, 0);
   b.route([...rim(1.02, 22), onT(1.02, 0)], 0, 0.02, 0);
-  [[-0.32, -1.0, -0.58, -1.92], [0.32, -1.0, 0.58, -1.92]].forEach(([x0, y0, x1, y1], i) => {
-    b.beam(onT(x0, y0), onT(x1, y1), 0.24, 1, 0);
-    b.beam(onT(x1, y1), onT(x1 + (i ? -0.1 : 0.1), y1 + 0.16), 0.06, 1, 0);
+  [-1, 1].forEach((side) => {
+    const tail = [onT(side * 0.12, -0.98), onT(side * 0.5, -0.92), onT(side * 0.78, -1.98), onT(side * 0.56, -1.76), onT(side * 0.36, -2.06)];
+    b.polyline(tail, 0.022, 1, true, 0);
+    b.quad(tail[0], tail[1], onT(side * 0.66, -1.9), onT(side * 0.4, -1.98), 0.35, 0);
   });
   const curly = (cx: number, dir: number): V3[] =>
     ([[0.15, 0.46], [0, 0.38], [0, 0.08], [-0.15, 0], [0, -0.08], [0, -0.38], [0.15, -0.46]] as const).map(([x, y]) => onT(cx + dir * x, y));
@@ -1115,7 +1113,7 @@ function buildMilestones(): Form {
   b.polyline(curly(0.5, -1), 0.04, 1, false, 0);
   b.polyline([onT(-0.13, 0.26), onT(0.02, 0.44), onT(0.02, -0.42)], 0.07, 1, false, 0);
   b.beam(onT(-0.16, -0.44), onT(0.2, -0.44), 0.06, 1, 0);
-  const threadA: V3[] = [onT(1.02, -0.1), [-3.6, T[1] - 0.1, 0.3], [-2.88, 0.7, 0]];
+  const threadA: V3[] = [onT(1.02, -0.1), [-3.6, T[1] - 0.1, 0.3], [-2.78, 0.6, 0]];
   b.polyline(threadA, 0.01, 1, false, 0);
   b.route(threadA, 0.2, 0.08, 0);
   b.node(threadA[2], 0.09, 1, 0);
@@ -1130,7 +1128,7 @@ function buildMilestones(): Form {
     b.polyline(pts, 0.012 - k * 0.002, 1, false, 1);
     b.route(pts, k * 0.2, 0.02, 1);
   });
-  const threadB: V3[] = [[P[0] - 0.95, P[1] - 0.2, P[2]], [3.6, P[1] - 0.2, 0.2], [2.88, 0.7, 0]];
+  const threadB: V3[] = [[P[0] - 0.95, P[1] - 0.2, P[2]], [3.6, P[1] - 0.2, 0.2], [2.78, 0.6, 0]];
   b.polyline(threadB, 0.01, 1, false, 1);
   b.route(threadB, 0.55, 0.08, 1);
   b.node(threadB[2], 0.09, 1, 1);

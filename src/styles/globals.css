@@ -114,7 +114,7 @@ html.lenis body {
   --hero-top: 5.75rem;
   --hero-copy: 28.5rem;
   --hero-usual: var(--fs-hero);
-  font-size: min(var(--hero-usual), calc((100svh - var(--hero-copy) - max(var(--hero-top), 12svh)) / 1.6));
+  font-size: min(var(--hero-usual), var(--hero-fit, calc((100svh - var(--hero-copy) - max(var(--hero-top), 12svh)) / 1.6)));
 }
 [data-hero-name] { top: max(5.75rem, 12svh); }
 @media (min-width: 1024px) {
@@ -122,7 +122,7 @@ html.lenis body {
 }
 /* Short phones, upright or on their side: the copy closes up so the name can keep its place. */
 @media (max-width: 1023px) and (max-height: 700px) {
-  .hero-name { --hero-top: 4.5rem; --hero-copy: 25rem; }
+  .hero-name { --hero-top: 4.5rem; --hero-copy: 27.5rem; }
   [data-hero-name] { top: max(4.5rem, 12svh); }
   [data-hero-copy] { padding-bottom: 1rem; }
   [data-hero-copy] > :first-child { margin-bottom: 0.625rem; row-gap: 0.25rem; }
@@ -526,62 +526,89 @@ details[open] .details-mark {
 
 /* ---------------------------------------- Hero: what is being learned */
 .exploring {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  min-height: 1.75rem;
+  min-height: 1.875rem;
   gap: 0.5rem;
-  padding: 0.25rem 0.625rem 0.25rem 0.5rem;
-  border: 1px solid var(--color-line);
-  background: rgb(8 9 13 / 0.6);
+  padding: 0.25rem 0.75rem 0.25rem 0.5rem;
+  border: 1px solid rgb(56 189 248 / 0.28);
+  background: rgb(56 189 248 / 0.05);
   color: var(--color-paper);
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 500;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  transition: border-color 0.35s;
+  white-space: nowrap;
+  transition: border-color 0.4s, background-color 0.4s;
 }
 .exploring:hover,
-.exploring:focus-visible { border-color: var(--color-line-strong); }
+.exploring:focus-visible {
+  border-color: rgb(56 189 248 / 0.6);
+  background: rgb(56 189 248 / 0.09);
+}
 .exploring-net {
   width: 1.25rem;
   height: 1rem;
   flex-shrink: 0;
 }
+/* At rest one connection at a time carries a signal, slowly, so the mark is alive without asking to be looked at. */
 .exploring-net path {
-  stroke: rgb(165 180 252 / 0.4);
-  stroke-width: 0.6;
-  stroke-dasharray: 3 12;
-  animation: exploring-signal 3.2s linear infinite;
-  animation-delay: calc(var(--i) * -0.45s);
+  stroke: rgb(165 180 252 / 0.28);
+  stroke-width: 0.7;
+  animation: exploring-pulse 6s var(--ease-expo) infinite;
+  animation-delay: calc(var(--i) * 1s);
+  transition: stroke 0.4s;
 }
-.exploring-net circle { fill: var(--color-sky); }
-@keyframes exploring-signal {
-  to { stroke-dashoffset: -15; }
+.exploring-net circle { fill: rgb(125 211 252 / 0.75); transition: fill 0.4s; }
+@keyframes exploring-pulse {
+  0%, 100% { stroke: rgb(165 180 252 / 0.28); }
+  6% { stroke: rgb(125 211 252 / 1); }
+  16% { stroke: rgb(165 180 252 / 0.28); }
 }
-/* Opens sideways, so the row beside it moves instead of the whole hero. */
+/* Pointed at, the whole network is lit at once, as the AI & ML cluster on the model is. */
+.exploring:hover .exploring-net path,
+.exploring:focus-visible .exploring-net path {
+  animation: none;
+  stroke: rgb(125 211 252 / 0.95);
+}
+.exploring:hover .exploring-net circle,
+.exploring:focus-visible .exploring-net circle { fill: var(--color-sky); }
+/*
+ * The line it adds opens to its right, over the caption beside it, which steps aside for it; nothing has to move. On
+ * narrow screens, where the row wraps, it opens below instead.
+ */
 .exploring-more {
-  display: grid;
-  grid-template-columns: 0fr;
+  position: absolute;
+  z-index: 1;
+  top: -1px;
+  left: calc(100% + 0.75rem);
+  display: flex;
+  align-items: center;
+  min-height: calc(100% + 2px);
+  padding: 0.4rem 0.625rem;
+  border: 1px solid var(--color-line-strong);
+  background: rgb(10 11 16 / 0.94);
   color: var(--color-mute);
   letter-spacing: 0.04em;
   text-transform: none;
-  transition: grid-template-columns 0.5s var(--ease-expo);
-}
-.exploring-more > span {
-  overflow: hidden;
-  white-space: nowrap;
   opacity: 0;
-  transition: opacity 0.4s;
+  pointer-events: none;
+  transform: translateY(-0.25rem);
+  transition: opacity 0.3s, transform 0.5s var(--ease-expo);
 }
 .exploring:hover .exploring-more,
-.exploring:focus-visible .exploring-more { grid-template-columns: 1fr; }
-.exploring:hover .exploring-more > span,
-.exploring:focus-visible .exploring-more > span { opacity: 1; }
-/* What it opens over steps aside rather than landing on the model. */
+.exploring:focus-visible .exploring-more {
+  opacity: 1;
+  transform: none;
+}
 .exploring ~ * { transition: opacity 0.3s; }
 .exploring:hover ~ *,
 .exploring:focus-visible ~ * { opacity: 0; }
+@media (max-width: 1023px) {
+  .exploring-more { top: calc(100% + 0.5rem); left: -1px; min-height: 0; }
+}
 
 /* ---------------------------------------- Achievements */
 .no-webgl .achievements { padding-top: 7rem; }
@@ -671,11 +698,11 @@ details[open] .details-mark {
   transform-style: preserve-3d;
   transition: transform 0.5s var(--ease-expo), box-shadow 0.6s, border-color 0.6s;
 }
-[data-focus] > .voice-face {
+[data-focus] .voice-face {
   border-color: var(--color-line-strong);
   box-shadow: 0 30px 70px -40px rgb(0 0 0 / 0.9);
 }
-[data-focus] > .voice-face:hover { box-shadow: 0 40px 90px -40px rgb(0 0 0 / 1); }
+[data-focus] .voice-face:hover { box-shadow: 0 40px 90px -40px rgb(0 0 0 / 1); }
 /* The edge takes the light from wherever the pointer is. */
 .voice-face::before {
   content: "";
@@ -716,12 +743,12 @@ details[open] .details-mark {
   transition: transform 0.6s var(--ease-expo);
 }
 .voice-quote > svg:nth-child(1) {
-  opacity: 0.28;
-  transform: translate3d(calc(var(--shift-x, 0) * -5px + 3px), calc(var(--shift-y, 0) * -5px + 3px), 0);
+  opacity: 0.22;
+  transform: translate3d(calc(var(--shift-x, 0) * -7px), calc(var(--shift-y, 0) * -7px), 0);
 }
 .voice-quote > svg:nth-child(2) {
   opacity: 0.55;
-  transform: translate3d(calc(var(--shift-x, 0) * -2px + 1.5px), calc(var(--shift-y, 0) * -2px + 1.5px), 8px);
+  transform: translate3d(calc(var(--shift-x, 0) * -3px), calc(var(--shift-y, 0) * -3px), 8px);
 }
 .voice-quote > svg:nth-child(3) {
   color: var(--color-periwinkle);
@@ -759,12 +786,17 @@ details[open] .details-mark {
   border: 1px solid var(--color-line-strong);
   background: rgb(8 9 13 / 0.7);
   color: var(--color-paper);
-  transition: background-color 0.3s, color 0.3s;
+  transition: background-color 0.3s, color 0.3s, transform 0.2s;
 }
 .voice-control:hover {
   background: var(--color-paper);
   color: var(--color-ink-0);
 }
+.voice-control:active { transform: scale(0.94); }
+/* The card in front can be taken hold of and thrown aside; the hand says so. */
+.voice-hold { touch-action: pan-y; }
+[data-focus] .voice-hold { cursor: grab; }
+[data-focus] .voice-hold:active { cursor: grabbing; }
 .voice-dot {
   display: flex;
   align-items: center;
@@ -797,9 +829,8 @@ details[open] .details-mark {
   .scroll-tick {
     animation: none;
   }
-  .exploring-net path { animation: none; stroke-dasharray: none; }
+  .exploring-net path { animation: none; }
   .exploring-more,
-  .exploring-more > span,
   .voice-face,
   .voice-quote > svg,
   .voice-person > span,

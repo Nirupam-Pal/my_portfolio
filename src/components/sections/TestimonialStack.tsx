@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Quote } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useMotionValue, useReducedMotion, useTransform, type PanInfo } from "motion/react";
 
 import { testimonials } from "@/data/testimonials";
 import { sceneStore } from "@/scenes/store";
 
 const SPRING = { type: "spring", stiffness: 150, damping: 24, mass: 0.9 } as const;
-const SWIPE = 44;
+/** How far, or how fast, the card in front has to be thrown before the next one takes its place. */
+const THROW = { distance: 70, speed: 420 };
 const COUNT = testimonials.length;
 const WIDE_QUERY = "(min-width: 768px)";
 
@@ -35,15 +36,17 @@ function placeFor(offset: number, wide: boolean) {
 
 /**
  * One voice in focus, the others waiting behind it in perspective. Nothing changes on its own: a quote should stay until
- * it has been read, so the visitor moves it on, by button, arrow key, swipe or by clicking the panel behind.
+ * it has been read, so the visitor moves it on: by button, arrow key, throwing the card aside, or clicking a panel behind.
  */
 export function TestimonialStack({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(0);
   const wide = useWide();
   const reduced = useReducedMotion();
   const stageRef = useRef<HTMLUListElement>(null);
-  const swipeFrom = useRef<number | null>(null);
-  const swiped = useRef(false);
+  const thrown = useRef(false);
+  // The card in front follows the hand, leaning the way it is pulled.
+  const pull = useMotionValue(0);
+  const lean = useTransform(pull, [-240, 240], [7, -7]);
 
   const go = (delta: number) => setActive((i) => (i + delta + COUNT) % COUNT);
 
@@ -130,21 +133,6 @@ export function TestimonialStack({ children }: { children: ReactNode }) {
         aria-live="polite"
         onPointerMove={onPointerMove}
         onPointerLeave={onPointerLeave}
-        onPointerDown={(e) => {
-          swipeFrom.current = e.clientX;
-          swiped.current = false;
-        }}
-        onPointerUp={(e) => {
-          if (swipeFrom.current === null) return;
-          const dx = e.clientX - swipeFrom.current;
-          swipeFrom.current = null;
-          if (Math.abs(dx) < SWIPE) return;
-          swiped.current = true;
-          go(dx < 0 ? 1 : -1);
-        }}
-        onPointerCancel={() => {
-          swipeFrom.current = null;
-        }}
         className="voices-stage m-0 grid list-none p-0"
       >
         {testimonials.map((t, i) => {
@@ -161,10 +149,34 @@ export function TestimonialStack({ children }: { children: ReactNode }) {
               data-focus={focused ? "" : undefined}
               aria-hidden={!focused}
               onClick={() => {
-                if (!focused && !swiped.current) setActive(i);
+                if (!focused && !thrown.current) setActive(i);
               }}
               className={`voice [grid-area:1/1] lg:justify-self-center ${focused ? "z-10" : "z-0 cursor-pointer"}`}
             >
+              <motion.div
+                className="voice-hold"
+                drag={focused ? "x" : false}
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.32}
+                dragTransition={{ bounceStiffness: 260, bounceDamping: 26 }}
+                dragDirectionLock
+                whileTap={focused && !reduced ? { scale: 0.985 } : undefined}
+                style={focused ? { x: pull, rotateY: reduced ? 0 : lean } : undefined}
+                onDragStart={() => {
+                  thrown.current = true;
+                  onPointerLeave();
+                }}
+                onDragEnd={(_, info: PanInfo) => {
+                  const far = Math.abs(info.offset.x) > THROW.distance || Math.abs(info.velocity.x) > THROW.speed;
+                  if (far) {
+                    // The next card takes the front from rest, not from where this one was let go.
+                    pull.jump(0);
+                    go(info.offset.x < 0 ? 1 : -1);
+                  }
+                  // A click fires after the hand lets go; this keeps it from also choosing a card.
+                  setTimeout(() => (thrown.current = false), 0);
+                }}
+              >
               <div className="voice-face">
                 <div aria-hidden="true" className="voice-meta label">
                   <span>Voice {String(i + 1).padStart(2, "0")}</span>
@@ -180,7 +192,7 @@ export function TestimonialStack({ children }: { children: ReactNode }) {
 
                 <motion.div
                   initial={false}
-                  animate={focused ? { opacity: 1, y: 0 } : { opacity: 0.6, y: 10 }}
+                  animate={focused ? { opacity: 1, y: 0, filter: "blur(0px)" } : { opacity: 0.3, y: 10, filter: "blur(3px)" }}
                   transition={reduced ? { duration: 0 } : { ...SPRING, delay: focused ? 0.12 : 0 }}
                   className="voice-words"
                 >
@@ -191,6 +203,7 @@ export function TestimonialStack({ children }: { children: ReactNode }) {
                   </p>
                 </motion.div>
               </div>
+              </motion.div>
             </motion.li>
           );
         })}

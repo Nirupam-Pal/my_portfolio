@@ -7,6 +7,8 @@ import { Split } from "@/components/ui/Split";
 import { TransitionLink } from "@/components/ui/TransitionLink";
 import { profile } from "@/data/profile";
 
+import { ExploringBadge } from "./ExploringBadge";
+import { HeroFit } from "./HeroFit";
 import { HeroModel, HeroModelCaption } from "./HeroModel";
 
 /** A still drawing of the laptop and what it connects to, shown only when WebGL is unavailable. */
@@ -32,28 +34,6 @@ function SystemDrawing() {
         ))}
       </g>
     </svg>
-  );
-}
-
-/** What is being learned, kept apart from the job title above it. Leads to the section that says more. */
-function ExploringBadge() {
-  const links = ["M3 3L10 7", "M3 8L10 7", "M3 13L10 7", "M3 3L10 12", "M3 13L10 12", "M10 7L17 8", "M10 12L17 8"];
-  const nodes = [[3, 3], [3, 8], [3, 13], [10, 7], [10, 12], [17, 8]];
-  return (
-    <TransitionLink href="#ai" className="exploring" aria-label="Exploring AI and ML: learning, experimenting and building. Go to the AI and ML section">
-      <svg aria-hidden="true" viewBox="0 0 20 16" className="exploring-net" fill="none">
-        {links.map((d, i) => (
-          <path key={d} d={d} style={{ "--i": i } as React.CSSProperties} />
-        ))}
-        {nodes.map(([cx, cy]) => (
-          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.25" />
-        ))}
-      </svg>
-      <span>Exploring AI &amp; ML</span>
-      <span className="exploring-more">
-        <span>Learning, experimenting &amp; building.</span>
-      </span>
-    </TransitionLink>
   );
 }
 
@@ -115,6 +95,7 @@ export function Hero() {
         </div>
       </div>
 
+      <HeroFit />
       <HeroModel />
     </section>
   );
